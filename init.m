@@ -85,7 +85,7 @@ R = diag([0.1, 1, 1, 1]);                                     % control penalty
 
 % Check controllability
 Co = ctrb(A_num, B_num);
-if rank(Co) == 12
+if rank(Co) == size(A_num,1)
     K = lqr(A_num, B_num, Q, R);
     disp('LQR gain matrix K:');
     disp(K);
