@@ -3,57 +3,47 @@ clear; close all; clc;
 %% ===============================================
 %  ---              LQR Design            ---
 % ================================================
+function xdot = quad_dynamics_nonlinear(x, m, g, u)
 
-function xdot = quad_dynamics_nonlinear(x, m, g, lambda, T)
-
-    % --- State unpack ---
-    p = x(1:3);
     v = x(4:6);
 
-    % --- Angles unpack ---
-    phi = lambda(1);
-    theta = lambda(2);
-    psi = lambda(3)
+    ax = u(1);
+    ay = u(2);
+    az = u(3);
 
-    % --- Rotation matrix (ZYX) ---
+    theta = ax / g;
+    phi   = -ay / g;
+    psi   = 0;
+
+    T = m*(az + g);
+
     cp = cos(phi); sp = sin(phi);
     ct = cos(theta); st = sin(theta);
-    cy = cos(psi); sy = sin(psi);
 
-    R = [cy*ct,  cy*st*sp - sy*cp,  cy*st*cp + sy*sp;
-         sy*ct,  sy*st*sp + cy*cp,  sy*st*cp - cy*sp;
-         -st,    ct*sp,             ct*cp];
+    R = [ct, sp*st, cp*st;
+         0,   cp,   -sp;
+         -st, sp*ct, cp*ct];
 
-    % --- Forces ---
     fT = R*[0;0;T];
-    fg =[0;0;-m*g];
-    
-    % Input acceleration vector
-    u = (fT + fg)/m;
+    fg = [0;0;-m*g];
 
-    % Velocity Inertial
-    vdot = u;
+    a = (fT + fg)/m;
 
-    % Position inertial
-    pdot = v;
-
-
-    % --- Full state derivative ---
-    xdot = [pdot;
-            vdot;
-            ];
+    xdot = [v; a];
 end
 
-
-function xdot = quad_dynamics_linear(x, m, g, lambda, T)
+function xdot = quad_dynamics_linear(x, m, g, u)
 
     % --- State unpack ---
     p = x(1:3);
     v = x(4:6);
     
+    % --- Thrust ---
+    T = u(3)+m*g;
+
     % --- Angles unpack ---
-    phi = lambda(1);
-    theta = lambda(2);
+    phi = -u(2)/g;
+    theta = u(1)/g;
 
     R = [1,  0, theta;
          0,  1, -phi;
@@ -64,10 +54,10 @@ function xdot = quad_dynamics_linear(x, m, g, lambda, T)
     fg =[0;0;-m*g];
     
     % Input acceleration vector
-    u = (fT + fg)/m;
+    a = (fT + fg)/m;
 
     % Velocity Inertial
-    vdot = u;
+    vdot = a;
 
     % Position inertial
     pdot = v;
@@ -79,52 +69,81 @@ function xdot = quad_dynamics_linear(x, m, g, lambda, T)
             ];
 end
 
-% =======================================
-% crazyflyer drone variables consideration
-% ---    and States Inicialization ---
-% =======================================
+% ==============================
+%  crazyflyer drone state space
+% ==============================
 m = 29e-3;
 g = 9.81;
-fg =[0;0;-m*g];
-fT = R*[0;0;T];
-R = [cy*ct,  cy*st*sp - sy*cp,  cy*st*cp + sy*sp;
-         sy*ct,  sy*st*sp + cy*cp,  sy*st*cp - cy*sp;
-         -st,    ct*sp,             ct*cp];
 
 % --- Variables declaration ---
-syms px py pz vx vy vz phi theta psi wx wy wz real
-syms Jx Jy Jz m l g real
-syms T1 T2 T3 T4 cQ cT real
-syms Cdx Cdy Cdz real
+A_lin = [zeros(3,3), eye(3); zeros(3,3), zeros(3,3)];
+B_lin = [zeros(3,3); eye(3)];
 
-% --- States Inicialization ---
-p      = [px; py; pz];
-v      = [vx; vy; vz];
+% --- Consider all variables obsv ---
+C_lin = eye(6);
 
-x = [p; v];
+sys = ss(A_lin, B_lin, C_lin, 0);
 
-% --- Gravity and drag ---
-% --- ZYX Rotation matrix R(phi, theta, psi) --
-cp = cos(phi);   sp = sin(phi);
-ct = cos(theta); st = sin(theta);
-cy = cos(psi);   sy = sin(psi);
+% ================================
+%      --- LQR Execution ---
+% ================================
 
-R = [cy*ct,  cy*st*sp - sy*cp,  cy*st*cp + sy*sp;
-     sy*ct,  sy*st*sp + cy*cp,  sy*st*cp - cy*sp;
-     -st,    ct*sp,              ct*cp            ];
+Q = eye(6);
+R = eye(3);
 
-% --- Dynamics ---
-pdot      = v;
-vdot      = (sym(1)/m)*(fg + fT);
+K = lqr(sys, Q, R);
 
-% =============================
-%  --- State equation ---
-% =============================
-f = [pdot; vdot];
-f = simplify(f);
+% --- simulation setup ---
+N = 1000;
+dt = 0.01;
 
-% =============================
-%      --- Jacobian ---
-% =============================
-%disp('Computing A = df/dx ...');
-A = jacobian(f, x);
+t = linspace(0, dt*N, N);
+
+x_nl = zeros(N,6);
+u = zeros(3,N);
+
+traj = [sin(t); t.^3; t.^2]';
+
+% --- Nonlinear ---
+for k = 1:N-1
+    xd = [traj(k,1); traj(k,2); traj(k,3); 0; 0; 0];
+    xk = x_nl(k,:)';
+    uk = -K*(xk - xd);
+
+    xdot = quad_dynamics_nonlinear(xk, m, g, uk);
+    x_nl(k+1,:) = xk' + dt*xdot';
+end
+
+x_lin = zeros(N,6);
+u = zeros(3,N);
+
+% --- Linear ---
+for k = 1:N-1
+
+    xd = [traj(k,1); traj(k,2); traj(k,3); 0; 0; 0]; 
+
+    xk = x_lin(k,:)';
+    uk = -K*(xk - xd);
+
+    xdot = quad_dynamics_linear(xk, m, g, uk);
+    x_lin(k+1,:) = xk' + dt*xdot';
+end
+
+figure;
+plot3(traj(:,1), traj(:,2), traj(:,3), 'o--', 'LineWidth', 2); hold on;
+plot3(x_nl(:,1), x_nl(:,2), x_nl(:,3), 'o', 'LineWidth', 1.8);
+plot3(x_lin(:,1), x_lin(:,2), x_lin(:,3), 'o--', 'LineWidth', 1.8);
+
+grid on;
+legend('Reference','Nonlinear','Linear', 'Location','best');
+xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]');
+title('Trajectory comparison');
+
+figure;
+plot(t, x_nl(:,4), 'b', t, x_lin(:,4), 'r--'); hold on;
+plot(t, x_nl(:,5), 'b', t, x_lin(:,5), 'r--');
+plot(t, x_nl(:,6), 'b', t, x_lin(:,6), 'r--');
+
+legend('vx NL','vx LIN','vy NL','vy LIN','vz NL','vz LIN');
+grid on;
+title('Velocity comparison');
