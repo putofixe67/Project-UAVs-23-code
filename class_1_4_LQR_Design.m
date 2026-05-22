@@ -139,4 +139,4 @@ ref.a = a_desired;
 % ==========================================
 % PLOTS
 % ==========================================
-plotResults(models, t, ref);
+plotResults(models, t, ref, ["Position"]);
