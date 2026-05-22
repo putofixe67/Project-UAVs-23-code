@@ -1,153 +1,89 @@
 clear; close all; clc;
 
-%% ================= Crazyflie Physical Parameters =================
-m  = 29e-3;                     % mass (kg)
-g  = 9.81;                      % gravity (m/s^2)
-% Inertia matrix (approximate Crazyflie 2.0 values)
-Jx = 1.395e-5;   Jy = 1.436e-5;   Jz = 2.173e-5;
-J  = diag([Jx, Jy, Jz]);
+% ==========================================
+% PRETTY AND CUTE AND AESTHETIC CONFIGURATION
+% ==========================================
+set(0, 'DefaultAxesFontName',       'Times New Roman', ...
+       'DefaultAxesFontSize',        11, ...
+       'DefaultTextFontName',        'Times New Roman', ...
+       'DefaultLineLineWidth',       1.3, ...
+       'DefaultAxesTickLabelInterp', 'latex', ...
+       'DefaultTextInterpreter',     'latex');
 
-%% ================= Symbolic State & Input Definition =================
-% State: [x, y, z, vx, vy, vz, phi, theta, psi, wx, wy, wz]'
-syms x y z vx vy vz phi theta psi wx wy wz real
-state = [x; y; z; vx; vy; vz; phi; theta; psi; wx; wy; wz];
+COL = [
+    0.173 0.412 0.694   % blue
+    0.153 0.561 0.329   % green
+    0.816 0.180 0.180   % red
+    0.494 0.278 0.706   % purple
+];
 
-% Inputs: total thrust (F) and body torques (Mx, My, Mz)
-syms F Mx My Mz real
-u = [F; Mx; My; Mz];
+% ==============================
+%  CRAZYFLIE DRONE STATE SPACE
+% ==============================
+m = 29e-3;
+g = 9.81;
+d = 1e-4;
 
-% Parameters (keep symbolic to allow substitution later)
-syms m_sym g_sym Jx_sym Jy_sym Jz_sym real
-Jsym = diag([Jx_sym, Jy_sym, Jz_sym]);
+A_lin = [zeros(3,3), eye(3); 
+         zeros(3,3), zeros(3,3)];
+B_lin = [zeros(3,3); 
+         eye(3)];
+C_lin = eye(6);
+sys = ss(A_lin, B_lin, C_lin, 0);
 
-%% ================= Nonlinear Equations of Motion =================
-% --- Rotation matrix (ZYX Euler) ---
-cp = cos(phi);   sp = sin(phi);
-ct = cos(theta); st = sin(theta);
-cy = cos(psi);   sy = sin(psi);
-R = [cy*ct,  cy*st*sp - sy*cp,  cy*st*cp + sy*sp;
-     sy*ct,  sy*st*sp + cy*cp,  sy*st*cp - cy*sp;
-     -st,    ct*sp,              ct*cp            ];
+% ================================
+%      --- LQR Execution ---
+% ================================
+Q = eye(6);
+Q(1:3, 1:3) = eye(3) * 10;
+R = eye(3);
+K = lqr(sys, Q, R);
 
-% Translational dynamics
-v = [vx; vy; vz];
-p_dot   = v;
-v_dot   = [0; 0; -g_sym] + (1/m_sym) * R * [0; 0; F];
+% Simulation setup
+N = 1000;
+dt = 0.01;
+t = linspace(0, dt*N, N)';   % 0 a 10 segundos, vector coluna
 
-% Rotational kinematics (ZYX Euler rates)
-W = [1,  sp*tan(theta),  cp*tan(theta);
-     0,  cp,            -sp;
-     0,  sp/ct,          cp/ct         ];
-eul_dot = W * [wx; wy; wz];
+% ================================
+%   --- Lyapunov Execution ---
+% ================================
 
-% Rotational dynamics (Euler's equation)
-omega = [wx; wy; wz];
-omega_skew = [0, -wz, wy; wz, 0, -wx; -wy, wx, 0];
-omega_dot = Jsym \ ( [Mx; My; Mz] - omega_skew * Jsym * omega );
+% Gains — Kv > I ensures V_dot < 0 (Lyapunov stability)
+Kp = 7.0 * eye(3);
+Kv = 7.0 * eye(3);
 
-% Full state derivative
-f_sym = [p_dot; v_dot; eul_dot; omega_dot];
+% ====================================================
+%  FLAGS: ligar/desligar feedforward de velocidade e aceleração
+% ====================================================
+USE_V_DESIRED = true;   % true  -> usa velocidade desejada na referência
+                        % false -> velocidade desejada = 0
+USE_A_DESIRED = true;   % true  -> adiciona aceleração desejada ao comando
+                        % false -> comando = -K*(x - xd)
 
-%% ================= Linearisation at Hover =================
-% Equilibrium: all states zero, F = m*g, torques zero
-eq_vals = [x,0; y,0; z,0; vx,0; vy,0; vz,0;
-           phi,0; theta,0; psi,0; wx,0; wy,0; wz,0;
-           F, m_sym*g_sym; Mx,0; My,0; Mz,0];
+% ====================================================
+%  TRAJECTÓRIA ESPIRAL (analítica, sem syms)
+% ====================================================
+R     = 2.0;          % raio da espiral [m]
+omega = 2*pi*0.2;     % frequência angular -> 2 voltas completas em 10 s
+v_z   = 0.5;          % velocidade de subida [m/s]
 
-f_eq = subs(f_sym, eq_vals(:,1), eq_vals(:,2));   % substitute into dynamics
-f_eq = simplify(f_eq);
+% Posição desejada
+px_ref = R * cos(omega * t);
+py_ref = R * sin(omega * t);
+pz_ref = v_z * t;
 
-A_sym = jacobian(f_sym, state);       % A = ∂f/∂x
-B_sym = jacobian(f_sym, u);           % B = ∂f/∂u
+% Velocidade desejada (derivada analítica)
+vx_ref = -R * omega * sin(omega * t);
+vy_ref =  R * omega * cos(omega * t);
+vz_ref =  v_z * ones(size(t));
 
-% The equilibrium column (eq_vals(:,2)) already contains:
-%   [0;0;0; 0;0;0; 0;0;0; 0;0;0; m*g; 0;0;0]
-% which matches [state; u] exactly.
-A_eq = subs(A_sym, [state; u], eq_vals(:,2));
-B_eq = subs(B_sym, [state; u], eq_vals(:,2));
+% Aceleração desejada (derivada segunda)
+ax_ref = -R * omega^2 * cos(omega * t);
+ay_ref = -R * omega^2 * sin(omega * t);
+az_ref =  0 * ones(size(t));
 
-% Substitute numeric physical parameters
-A_num = double(subs(A_eq, [m_sym, g_sym, Jx_sym, Jy_sym, Jz_sym], ...
-                         [m,    g,    Jx,    Jy,    Jz]));
-B_num = double(subs(B_eq, [m_sym, g_sym, Jx_sym, Jy_sym, Jz_sym], ...
-                         [m,    g,    Jx,    Jy,    Jz]));
+% Matrizes de referência (já são colunas porque t é coluna)
+p_desired = [px_ref, py_ref, pz_ref];
+v_desired = [vx_ref, vy_ref, vz_ref];
+a_desired = [ax_ref, ay_ref, az_ref];
 
-% Display the state-space matrices
-disp('Linearised A matrix (12x12):');
-disp(A_num);
-disp('Linearised B matrix (12x4):');
-disp(B_num);
-
-%% ================= LQR Design Example (optional) =================
-% Weighting matrices (tune as needed)
-Q = diag([10, 10, 100, 1, 1, 5, 1, 1, 1, 0.1, 0.1, 0.1]);  % state penalty
-R = diag([0.1, 1, 1, 1]);                                     % control penalty
-
-% Check controllability
-Co = ctrb(A_num, B_num);
-if rank(Co) == size(A_num,1)
-    K = lqr(A_num, B_num, Q, R);
-    disp('LQR gain matrix K:');
-    disp(K);
-else
-    disp('System not fully controllable – check model/linearisation.');
-end
-
-%% ================= Supporting Functions =================
-% The functions below are corrected versions of your original ones.
-% They describe a **simplified** quadcopter model (position/velocity only),
-% treating attitude and thrust as external inputs.
-
-function xdot = quad_dynamics_nonlinear(x, m, g, lambda, T)
-    % State: [px; py; pz; vx; vy; vz]
-    % lambda = [phi; theta; psi]  (commanded angles)
-    % T = total thrust
-    p = x(1:3);
-    v = x(4:6);
-
-    phi = lambda(1);
-    theta = lambda(2);
-    psi = lambda(3);       % semicolon added
-
-    % Full rotation matrix (ZYX)
-    cp = cos(phi); sp = sin(phi);
-    ct = cos(theta); st = sin(theta);
-    cy = cos(psi); sy = sin(psi);
-    R = [cy*ct,  cy*st*sp - sy*cp,  cy*st*cp + sy*sp;
-         sy*ct,  sy*st*sp + cy*cp,  sy*st*cp - cy*sp;
-         -st,    ct*sp,             ct*cp];
-
-    fT = R * [0; 0; T];
-    fg = [0; 0; -m*g];
-    u  = (fT + fg) / m;
-
-    pdot = v;
-    vdot = u;
-
-    xdot = [pdot; vdot];
-end
-
-function xdot = quad_dynamics_linear(x, m, g, lambda, T)
-    % Linearised translational dynamics around hover,
-    % assuming small phi, theta and psi = 0.
-    % State: [px; py; pz; vx; vy; vz]
-    % lambda = [phi; theta]   (psi is ignored here, set to 0)
-    p = x(1:3);
-    v = x(4:6);
-
-    phi = lambda(1);
-    theta = lambda(2);
-    % Linear rotation matrix (psi = 0)
-    R = [1,  0, theta;
-         0,  1, -phi;
-         -theta, 0, 1];
-
-    fT = R * [0; 0; T];
-    fg = [0; 0; -m*g];
-    u  = (fT + fg) / m;
-
-    pdot = v;
-    vdot = u;
-
-    xdot = [pdot; vdot];
-end
