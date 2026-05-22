@@ -9,6 +9,7 @@ addpath("src\");
 % ============================
 class_1_4_LQR_Design();
 
+close all;
 % ==============================
 %  crazyflyer drone state space
 % ==============================
