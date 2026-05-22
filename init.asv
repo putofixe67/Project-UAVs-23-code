@@ -49,8 +49,8 @@ t = linspace(0, dt*N, N)';   % 0 a 10 segundos, vector coluna
 % ================================
 
 % Gains — Kv > I ensures V_dot < 0 (Lyapunov stability)
-Kp = 10.5 * eye(3);
-Kv = 5.0 * eye(3);
+Kp = 7.0 * eye(3);
+Kv = 7.0 * eye(3);
 
 % ====================================================
 %  FLAGS: ligar/desligar feedforward de velocidade e aceleração
