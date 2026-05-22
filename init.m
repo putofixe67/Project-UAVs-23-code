@@ -61,7 +61,7 @@ USE_A_DESIRED = true;   % true  -> adiciona aceleração desejada ao comando
                         % false -> comando = -K*(x - xd)
 
 % ====================================================
-%  TRAJECTÓRIA ESPIRAL (analítica, sem syms)
+%  TRAJECTÓRIA ESPIRAL (analítica)
 % ====================================================
 R     = 1.0;          % raio da espiral [m]
 omega = 2*pi*0.1;     % frequência angular -> 2 voltas completas em 10 s
