@@ -24,33 +24,83 @@ m = 29e-3;
 g = 9.81;
 d = 1e-4;
 
-A_lin = [zeros(3,3), eye(3); 
-         zeros(3,3), zeros(3,3)];
-B_lin = [zeros(3,3); 
-         eye(3)];
-C_lin = eye(6);
-sys = ss(A_lin, B_lin, C_lin, 0);
-
 % ================================
 %      --- LQR Execution ---
 % ================================
-Q = eye(6);
-Q(1:3, 1:3) = eye(3) * 10;
-R = eye(3);
-K = lqr(sys, Q, R);
 
 % Simulation setup
 N = 1000;
 dt = 0.01;
 t = linspace(0, dt*N, N)';   % 0 a 10 segundos, vector coluna
 
+% ===================
+% --- LQR Linear ---
+% ===================
+
+A_lin =  [zeros(3,3), eye(3); zeros(3,3), -d*eye(3)];
+B_lin = [zeros(3,3); 
+         eye(3)];
+C_lin = eye(6);
+sys = ss(A_lin, B_lin, C_lin, 0);
+
+Q_lin = eye(6);
+Q_lin(1:3, 1:3) = eye(3) * 10;
+R_lin = eye(3);
+K_lin = lqr(sys, Q_lin, R_lin);
+
+% ======================
+% --- LQR Nonlinear ---
+% ======================
+
+
+A_nl =  [zeros(3,3), eye(3); zeros(3,3), -d*eye(3)];
+B_nl = [zeros(3,3); 
+         eye(3)];
+C_nl = eye(6);
+sys = ss(A_nl, B_nl, C_nl, 0);
+
+Q_nl = eye(6);
+Q_nl(3, 3) = 100;
+Q_nl(1:2, 1:2) = eye(2) * 100;
+
+Q_nl(4, 4) = 10;
+Q_nl(5, 5) = 10;
+Q_nl(6, 6) = 10;
+
+R_nl = eye(3);
+K_nl = lqr(sys, Q_nl, R_nl);
+
+% ===================================
+% --- LQR Error Space Execution ---
+% ===================================
+
+A_error = [zeros(3,3), eye(3); zeros(3,3), -d*eye(3)];
+B_error = [zeros(3,3); eye(3)];
+C_error = eye(6);
+
+sys = ss(A_error, B_error, C_error, 0);
+
+Q_LQR_ES = eye(6);
+Q_LQR_ES(1:3, 1:3) = eye(3) * 10;
+R_LQR_ES = eye(3);
+
+Q_LQR_ES = eye(6);
+Q_LQR_ES(3, 3) = 100;
+Q_nl(1:2, 1:2) = eye(2) * 100;
+
+Q_nl(4, 4) = 10;
+Q_nl(5, 5) = 10;
+Q_nl(6, 6) = 10;
+
+K_LQR_ES = lqr(sys, Q_LQR_ES, R_LQR_ES);
+
 % ================================
 %   --- Lyapunov Execution ---
 % ================================
 
 % Gains — Kv > I ensures V_dot < 0 (Lyapunov stability)
-Kp = 7.0 * eye(3);
-Kv = 7.0 * eye(3);
+Kp = 10.5 * eye(3);
+Kv = 5.0 * eye(3);
 
 % ====================================================
 %  FLAGS: ligar/desligar feedforward de velocidade e aceleração
@@ -61,7 +111,7 @@ USE_A_DESIRED = true;   % true  -> adiciona aceleração desejada ao comando
                         % false -> comando = -K*(x - xd)
 
 % ====================================================
-%  TRAJECTÓRIA ESPIRAL (analítica, sem syms)
+%  TRAJECTÓRIA ESPIRAL (analítica)
 % ====================================================
 R     = 1.0;          % raio da espiral [m]
 omega = 2*pi*0.1;     % frequência angular -> 2 voltas completas em 10 s

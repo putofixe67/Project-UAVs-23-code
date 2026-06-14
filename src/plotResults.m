@@ -250,4 +250,84 @@ for g = 1:nList
     end
 end
 
+%% ==========================================================
+%              STATE ERROR NORM (POSITION + VELOCITY)
+% ===========================================================
+if strcmpi(graphName,"ErrorNorm")
+
+    fig6 = figure('Name','State Error Norm','Color','w');
+    ax = axes(fig6);
+
+    hold(ax,'on');
+    grid(ax,'on');
+    box(ax,'on');
+
+    for k = 1:nModels
+
+        % Position error
+        ep = models(k).x(:,1:3) - ref.p;
+
+        % Velocity error
+        if isfield(ref,'v') && ~isempty(ref.v)
+            ev = models(k).x(:,4:6) - ref.v;
+
+            % Combined state error [ep ev]
+            e = [ep ev];
+        else
+            % Only position if no velocity reference exists
+            e = ep;
+        end
+
+        % Euclidean norm over time
+        e_norm = vecnorm(e,2,2);
+
+        plot(ax, ...
+            t, ...
+            e_norm, ...
+            'Color', models(k).color, ...
+            'LineWidth',1.8, ...
+            'DisplayName', models(k).name);
+    end
+
+    xlabel(ax,'$t$ [s]', ...
+        'Interpreter','latex');
+
+    ylabel(ax,'$\|e\|$', ...
+        'Interpreter','latex');
+
+    if isfield(ref,'v') && ~isempty(ref.v)
+        title(ax,'State Error Norm (Position + Velocity)');
+    else
+        title(ax,'Position Error Norm');
+    end
+
+    legend(ax,'Location','best');
+end
+
+for k = 1:nModels
+
+    ep = models(k).x(:,1:3) - ref.p;
+    ev = models(k).x(:,4:6) - ref.v;
+
+    % weighted state error
+    alpha_p = 1;
+    alpha_v = 1;
+
+    e_norm = sqrt( ...
+        alpha_p*sum(ep.^2,2) + ...
+        alpha_v*sum(ev.^2,2));
+
+    % Metrics
+    RMSE = sqrt(mean(e_norm.^2));
+    ISE  = trapz(t, e_norm.^2);
+    ITAE = trapz(t, t .* e_norm);
+    peak = max(e_norm);
+
+    fprintf('\n%s\n', models(k).name);
+    fprintf('RMSE = %.4f\n', RMSE);
+    fprintf('ISE  = %.4f\n', ISE);
+    fprintf('ITAE = %.4f\n', ITAE);
+    fprintf('Peak = %.4f\n', peak);
+end
+
 end

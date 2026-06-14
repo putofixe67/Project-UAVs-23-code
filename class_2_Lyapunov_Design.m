@@ -10,6 +10,7 @@ addpath("src\");
 class_1_4_LQR_Design();
 
 close all;
+
 % ==============================
 %  crazyflyer drone state space
 % ==============================
@@ -71,4 +72,4 @@ models(4).color = COL(4,:);
 % ==========================================
 % PLOTS
 % ==========================================
-plotResults(models, t, ref, ["Position"]);
+plotResults(models, t, ref, ["Position", "Velocity", "Error", "ErrorNorm"]);
