@@ -105,9 +105,8 @@ K_LQR_ES = lqr(sys, Q_LQR_ES, R_LQR_ES);
 % Gains — Kv > I ensures V_dot < 0 (Lyapunov stability)
 Kp = 10 * eye(3);
 
-Kv = 5 * eye(3);
+Kv = 6 * eye(3);
 Kv(1, 1) = 6;
-
 
 % ====================================================
 %  FLAGS: ligar/desligar feedforward de velocidade e aceleração
@@ -138,8 +137,6 @@ vz_ref =  v_z * ones(size(t));
 ax_ref = -R * omega^2 * cos(omega * t);
 ay_ref = -R * omega^2 * sin(omega * t);
 az_ref =  0 * ones(size(t));
-
-
 
 % Matrizes de referência (já são colunas porque t é coluna)
 p_desired = [px_ref, py_ref, pz_ref];
