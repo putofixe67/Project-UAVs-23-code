@@ -22,7 +22,7 @@ COL = [
 % ==============================
 m = 29e-3;
 g = 9.81;
-d = 1e-4;
+d = 1e-3;
 
 % ================================
 %      --- LQR Execution ---
@@ -43,58 +43,50 @@ B_lin = [zeros(3,3);
 C_lin = eye(6);
 sys = ss(A_lin, B_lin, C_lin, 0);
 
-Q_lin = eye(6);
-Q_lin(3, 3) = 10;
-Q_lin(1:2, 1:2) = eye(2) * 100;
+% Fine tuning
+Q_lin = 10*eye(6); 
+Q_lin(1, 1) = 38; 
+Q_lin(2, 2) = 38; 
+Q_lin(4, 4) = 38;
 
-Q_lin(4, 4) = 10;
-Q_lin(5, 5) = 10;
-Q_lin(6, 6) = 10;
+R_lin = 8.5*eye(3);
 
-R_lin = eye(3);
 K_lin = lqr(sys, Q_lin, R_lin);
 
 % ======================
 % --- LQR Nonlinear ---
 % ======================
-
-
 A_nl =  [zeros(3,3), eye(3); zeros(3,3), -d*eye(3)];
 B_nl = [zeros(3,3); 
          eye(3)];
 C_nl = eye(6);
 sys = ss(A_nl, B_nl, C_nl, 0);
 
-Q_nl = eye(6);
-Q_nl(3, 3) = 100;
-Q_nl(1:2, 1:2) = eye(2) * 100;
+% Fine tuning
+Q_nl = 10*eye(6); 
+Q_nl(1, 1) = 38; 
+Q_nl(2, 2) = 38; 
+Q_nl(4, 4) = 38;
 
-Q_nl(4, 4) = 10;
-Q_nl(5, 5) = 10;
-Q_nl(6, 6) = 10;
+R_nl = 8.5*eye(3);
 
-R_nl = eye(3);
 K_nl = lqr(sys, Q_nl, R_nl);
 
 % ===================================
 % --- LQR Error Space Execution ---
 % ===================================
-
 A_error = [zeros(3,3), eye(3); zeros(3,3), -d*eye(3)];
 B_error = [zeros(3,3); eye(3)];
 C_error = eye(6);
-
 sys = ss(A_error, B_error, C_error, 0);
 
-Q_LQR_ES = eye(6);
-Q_LQR_ES(3, 3) = 100;
-Q_LQR_ES(1:2, 1:2) = eye(2) * 100;
+% Without proper tuning
+Q_LQR_ES = 10*eye(6); 
+Q_LQR_ES(1, 1) = 38; 
+Q_LQR_ES(2, 2) = 38; 
+Q_LQR_ES(4, 4) = 38;
 
-Q_LQR_ES(4, 4) = 10;
-Q_LQR_ES(5, 5) = 10;
-Q_LQR_ES(6, 6) = 10;
-
-R_LQR_ES = eye(3);
+R_LQR_ES = 8.5*eye(3);
 
 K_LQR_ES = lqr(sys, Q_LQR_ES, R_LQR_ES);
 
@@ -103,10 +95,12 @@ K_LQR_ES = lqr(sys, Q_LQR_ES, R_LQR_ES);
 % ================================
 
 % Gains — Kv > I ensures V_dot < 0 (Lyapunov stability)
-Kp = 10 * eye(3);
+Kp = 7.5 * eye(3);
 
-Kv = 6 * eye(3);
-Kv(1, 1) = 6;
+Kv = eye(3);
+Kv(1, 1) = 8;
+Kv(2, 2) = 8;
+Kv(3, 3) = 10.5;
 
 % ====================================================
 %  FLAGS: ligar/desligar feedforward de velocidade e aceleração

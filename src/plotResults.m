@@ -2,6 +2,12 @@ function plotResults(models, t, ref, graphList)
 
 nModels = numel(models);
 
+sys = models(1).sysConsts;
+
+m = sys(1);
+g = sys(2);
+d = sys(3);
+
 disp('==========================================');
 
 if isfield(ref,'v') && ~isempty(ref.v)
@@ -20,9 +26,9 @@ disp('==========================================');
 
 nList = length(graphList);
 
-for g = 1:nList
+for k = 1:nList
 
-    graphName = string(graphList(g));
+    graphName = string(graphList(k));
 
     %% ==========================================================
     %                       POSITION
@@ -43,6 +49,7 @@ for g = 1:nList
             'DisplayName','Reference');
 
         for k = 1:nModels
+
             plot3(ax1, ...
                 models(k).x(:,1), ...
                 models(k).x(:,2), ...
@@ -129,6 +136,7 @@ for g = 1:nList
             end
 
             for k = 1:nModels
+                
                 plot(ax, ...
                     t, ...
                     models(k).x(:,j+3), ...
@@ -156,39 +164,66 @@ for g = 1:nList
     %% ==========================================================
     %                    CONTROL INPUTS
     % ===========================================================
-    if strcmpi(graphName,"Inputs")
-
+if strcmpi(graphName,"Inputs")
         fig4 = figure('Name','Actuation Inputs','Color','w');
-        tlo3 = tiledlayout(fig4,1,3, ...
-            'TileSpacing','compact');
-
-        u_labels = {'$u_1$','$u_2$','$u_3$'};
-
+        tlo3 = tiledlayout(fig4,1,3,'TileSpacing','compact');
+        u_labels = {'$\theta$ [deg]','$\phi$ [deg]','$T$ [N]'};
+        u_sat = [10, 10, 0.588 ]; % [deg, deg, N]
+        
         for j = 1:3
-
             ax = nexttile(tlo3);
-            hold(ax,'on');
-            grid(ax,'on');
-            box(ax,'on');
-
+            hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+            
             for k = 1:nModels
-                plot(ax, ...
-                    t, ...
-                    models(k).u(j,:), ...
+                uF = models(k).u; 
+                
+                if strcmpi(models(k).name, "Lyapunov")
+                    
+                    a = uF + [0; 0; m*g]; 
+                    T = vecnorm(a, 2, 1);
+                    
+                    % Normalize columns to find directional components
+                    b3 = a ./ T; 
+                    theta = 180/pi * atan2(-b3(1,:), b3(3,:));
+                    phi   = 180/pi * atan2(b3(2,:), b3(3,:));
+                    u_plot = [theta; phi; T];
+                else
+                    % For LQR models (3 x N matrix)
+                    T = uF(3,:) + m*g; % 1 x N
+                    u_plot = [
+                        180/pi * (-uF(2,:) ./ T); % Theta (1 x N)
+                        180/pi * ( uF(1,:) ./ T); % Phi (1 x N)
+                        T
+                    ];
+                end % <-- Fixed from '}' to 'end'
+                
+                plot(ax, t, u_plot(j,:), ...
                     'Color', models(k).color, ...
                     'LineWidth',1.5, ...
-                    'DisplayName', models(k).name);
+                    'DisplayName', models(k).name); 
             end
-
-            ylabel(ax,u_labels{j}, ...
-                'Interpreter','latex');
-            xlabel(ax,'$t$ [s]', ...
-                'Interpreter','latex');
-
+            
+            if j==1 || j==2
+                yline(ax, 40, '--r','LineWidth',1.5,'DisplayName','Physical limit');
+                yline(ax,-40, '--r','LineWidth',1.5,'HandleVisibility','off');
+            end 
+            if j == 1
+                yline(ax, u_sat(1), '--k','LineWidth',1.5,'DisplayName','Physical & Model limit');
+                yline(ax,-u_sat(1), '--k','LineWidth',1.5,'HandleVisibility','off');
+            end
+            if j == 2
+                yline(ax, u_sat(2), '--k','LineWidth',1.5,'DisplayName','Physical & Model limit');
+                yline(ax,-u_sat(2), '--k','LineWidth',1.5,'HandleVisibility','off');
+            end
+            if j == 3
+                yline(ax, u_sat(3), '--k','LineWidth',1.5,'DisplayName','Physical & Model limit');
+                yline(ax,-u_sat(3), '--k','LineWidth',1.5,'HandleVisibility','off');
+            end
+            ylabel(ax,u_labels{j},'Interpreter','latex');
+            xlabel(ax,'$t$ [s]','Interpreter','latex');
             if j == 2
                 title(ax,'Control Inputs');
             end
-
             if j == 1
                 legend(ax,'Location','best');
             end
@@ -199,7 +234,7 @@ for g = 1:nList
     %% ==========================================================
     %                    POSITION ERROR
     % ===========================================================
-    if strcmpi(graphName,"Error")
+    if strcmpi(graphName,"PositionError")
 
         fig5 = figure('Name','Position Error','Color','w');
         tlo4 = tiledlayout(fig5,3,1, ...
@@ -227,11 +262,19 @@ for g = 1:nList
 
                 e = models(k).x(:,j) - ref.p(:,j);
 
-                plot(ax, t, e, ...
-                    'Color', models(k).color, ...
-                    'LineWidth',1.2, ...
-                    'DisplayName', ...
-                    [models(k).name ' error']);
+                sigma = std(e);
+                bound = 3 * sigma;
+
+                plot(ax, t, e, ... 
+                'Color', models(k).color, ...
+                'LineWidth',1.2, 'DisplayName', ...
+                [models(k).name ' error']);
+
+                yline(ax,  bound, '--', 'Color', models(k).color, ...
+            'LineWidth',1.0, 'HandleVisibility','off');
+
+                yline(ax, -bound, '--', 'Color', models(k).color, ...
+            'LineWidth',1.0, 'HandleVisibility','off');
             end
 
             ylabel(ax, labels{j}, ...
@@ -246,6 +289,71 @@ for g = 1:nList
                 xlabel(ax,'$t$ [s]', ...
                     'Interpreter','latex');
             end
+        end
+    end
+end
+
+%% ==========================================================
+%                    VELOCITY ERROR
+% ===========================================================
+
+if strcmpi(graphName,"VelocityError")
+
+    fig6 = figure('Name','Velocity Error','Color','w');
+    tlo5 = tiledlayout(fig6,3,1, ...
+        'TileSpacing','compact');
+
+    labels = { ...
+        '$v_x$ error', ...
+        '$v_y$ error', ...
+        '$v_z$ error'};
+
+    for j = 1:3
+
+        ax = nexttile(tlo5);
+        hold(ax,'on');
+        grid(ax,'on');
+        box(ax,'on');
+
+        % Zero reference line
+        plot(ax, t, zeros(size(t)), ...
+            'k--', ...
+            'LineWidth',1.2, ...
+            'DisplayName','Zero error');
+
+        for k = 1:nModels
+
+            v_model = models(k).x(:,4:6);
+            v_ref   = ref.v;
+
+            ev = v_model(:,j) - v_ref(:,j);
+
+            sigma = std(ev);
+            bound = 3 * sigma;
+
+            plot(ax, t, ev, ... 
+            'Color', models(k).color, ...
+            'LineWidth',1.2, 'DisplayName', ...
+            [models(k).name ' error']);
+
+            yline(ax,  bound, '--', 'Color', models(k).color, ...
+            'LineWidth',1.0, 'HandleVisibility','off');
+
+            yline(ax, -bound, '--', 'Color', models(k).color, ...
+            'LineWidth',1.0, 'HandleVisibility','off');
+        end
+
+        ylabel(ax, labels{j}, ...
+            'Interpreter','latex');
+
+        if j == 1
+            title(ax,'Velocity Error');
+            legend(ax,'Location','best');
+        end
+
+        if j == 3
+            xlabel(ax,'$t$ [s]', ...
+                'Interpreter','latex');
         end
     end
 end

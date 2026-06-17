@@ -64,12 +64,14 @@ end
 
 u_lya(:, N) = u_lya(:, N-1);
 
+models(4).sysConsts = [m, g, d];
 models(4).name = 'Lyapunov';
 models(4).x    = x_lya;
-models(4).u    = u_lya;
+models(4).u    = u_lya*m;
 models(4).color = COL(4,:);
 
 % ==========================================
 % PLOTS
 % ==========================================
-plotResults(models, t, ref, ["Position", "Velocity", "Error", "ErrorNorm"]);
+plotResults(models, t, ref, ["Position", "Velocity", "Inputs", "PositionError", "VelocityError"]);
+animateUAV(models, t, ref);

@@ -22,6 +22,7 @@ u_error = zeros(3,N);
 % ==================
 % ---  Linear ---
 % ==================
+
 for k = 1:N-1
 
     if USE_V_DESIRED
@@ -47,6 +48,7 @@ u_lin(:, N) = u_lin(:, N-1);
 % ==================
 % --- Nonlinear ---
 % ==================
+
 for k = 1:N-1
   
     % Reference for the desired state
@@ -76,12 +78,6 @@ u_nl(:, N) = u_nl(:, N-1);
 % --- LQR Error Space Execution ---
 % ===================================
 
-A_error = [zeros(3,3), eye(3); zeros(3,3), -d*eye(3)];
-B_error = [zeros(3,3); eye(3)];
-C_error = eye(6);
-
-sys = ss(A_error, B_error, C_error, 0);
-
 for k = 1:N-1
 
     if USE_V_DESIRED
@@ -95,7 +91,7 @@ for k = 1:N-1
     ek = xk - xd;
     x_error(k,:) = ek';
 
-    uk = -K_LQRerror * ek;
+    uk = -K_LQR_ES * ek;
 
     if USE_A_DESIRED
         uk = uk + a_desired(k,:)';
@@ -126,6 +122,8 @@ models(3).x    = x_lin;
 models(3).u    = u_lin;
 models(3).color = COL(3,:);
 
+models(3) = [];
+
 ref.p = p_desired;
 ref.v = v_desired;
 ref.a = a_desired;
@@ -134,4 +132,4 @@ ref.a = a_desired;
 % ==========================================
 % PLOTS
 % ==========================================
-plotResults(models, t, ref, ["Position"]);
+plotResults(models, t, ref,["Position", "Velocity", "Error", "ErrorNorm"]);

@@ -107,19 +107,23 @@ uLQR_ES(:, N) = uLQR_ES(:, N-1);
 
 %% ==========================================
 % Data structures to simplicity
+
+models(1).sysConsts = [m, g, d];
 models(1).name = 'LQR Nonlinear model';
 models(1).x    = x_nl;
-models(1).u    = u_nl;
+models(1).u    = u_nl*m;
 models(1).color = COL(1,:);
 
+models(2).sysConsts = [m, g, d];
 models(2).name = 'LQR Nonlinear model ES';
 models(2).x    = xLQR_ES;
-models(2).u    = uLQR_ES;
+models(2).u    = uLQR_ES*m;
 models(2).color = COL(2,:);
 
+models(3).sysConsts = [m, g, d];
 models(3).name = 'LQR Linear model';
 models(3).x    = x_lin;
-models(3).u    = u_lin;
+models(3).u    = u_lin*m;
 models(3).color = COL(3,:);
 
 ref.p = p_desired;
@@ -130,4 +134,4 @@ ref.a = a_desired;
 % ==========================================
 % PLOTS
 % ==========================================
-plotResults(models, t, ref,["Position", "Velocity", "Error"]);
+plotResults(models, t, ref,["Position", "Velocity", "Inputs", "PositionError", "VelocityError"]);
