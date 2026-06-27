@@ -1,7 +1,7 @@
 # Project UAVs — Report 2: Crazyflie Motion Control and Planning
 
 > **Course project** for Unmanned Aerial Vehicles 2025/2026.  
-> Group 6 — IST
+> Group 6
 
 ---
 
