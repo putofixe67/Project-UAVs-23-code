@@ -1,7 +1,7 @@
-# Project UAVs — 23 UAVs ICUAS 2026
+# Project UAVs — Report 2: Crazyflie Motion Control and Planning
 
-> **MATLAB simulation and control design** for quadrotor UAVs developed for the **ICUAS 2026** competition.  
-> This repository contains all control code, dynamics models, animation tooling, and results-plotting infrastructure that are part of the "23 UAVs" project work.
+> **Course project** for Unmanned Aerial Vehicles 2025/2026.  
+> Group 6 — IST
 
 ---
 
@@ -9,10 +9,16 @@
 
 1. [Project Overview](#project-overview)
 2. [Repository Structure](#repository-structure)
-3. [Key Files — ICUAS 2026](#key-files--icuas-2026)
-4. [How the Animation Works](#how-the-animation-works)
-5. [Controller Designs](#controller-designs)
-6. [Running the Simulation](#running-the-simulation)
+3. [Part 1 — Linear Control (LQR)](#part-1--linear-control-lqr)
+4. [Part 2 — Nonlinear Control (Lyapunov)](#part-2--nonlinear-control-lyapunov)
+5. [Part 3 — ICUAS-Inspired Planning](#part-3--icuas-inspired-planning)
+   - [Competition Scenario](#competition-scenario)
+   - [Planning Algorithm](#planning-algorithm)
+   - [Option A: 5 Free Relay Drones](#option-a-5-free-relay-drones)
+   - [Option B: Shadow Drone + 4 Free Relays](#option-b-shadow-drone--4-free-relays)
+   - [What Changes Between Options](#what-changes-between-options)
+   - [How the Animation Works](#how-the-animation-works)
+6. [Running the Code](#running-the-code)
 7. [Videos](#videos)
 8. [Report](#report)
 
@@ -20,16 +26,15 @@
 
 ## Project Overview
 
-This project implements and compares three quadrotor control strategies on a spiral reference trajectory:
+The project is divided into three independent parts:
 
-| Controller | Model | Method |
+| Part | Topic | Language |
 |---|---|---|
-| Linear LQR | Linearised quadrotor | State-feedback |
-| Nonlinear LQR | Full nonlinear quadrotor | State-feedback |
-| Error-Space LQR | Linearised quadrotor | Error-state formulation |
-| Lyapunov | Nonlinear quadrotor | Lyapunov stability theory |
+| 1 | Linear Control — LQR (absolute state, nonlinear plant, error-space) | MATLAB |
+| 2 | Nonlinear Control — Lyapunov stability-based controller | MATLAB |
+| 3 | Motion planning and animation inspired by ICUAS 2026 competition scenario | Python |
 
-The drone modelled is a **Crazyflie** (mass 29 g). The reference trajectory is a **spiral** of 1 m radius completing 2 revolutions over 10 s while ascending at 0.1 m/s.
+Parts 1 and 2 are MATLAB simulations of a Crazyflie 2.1 (mass 29 g) tracking a spiral trajectory. **Part 3 is entirely separate**: it is a Python planning and animation exercise inspired by the ICUAS 2026 UAV Competition scenario, where drones must maintain a communication relay chain to a moving ground rover in an urban environment. The team did not participate in the competition — this is a course exercise.
 
 ---
 
@@ -38,190 +43,249 @@ The drone modelled is a **Crazyflie** (mass 29 g). The reference trajectory is a
 ```
 Project-UAVs-23-code/
 │
-├── init.m                        # Entry point — drone parameters, trajectory, controller gains
-├── maio.m                        # Standalone script: nonlinear vs linear comparison
-├── class_1_4_LQR_Design.m        # Main simulation: LQR variants (linear / nonlinear / error-space)
-├── class_2_Lyapunov_Design.m     # Main simulation: Lyapunov controller
+│  ── Parts 1 & 2: MATLAB ──────────────────────────────────────────────────────
+│
+├── init.m                             # Parameters, trajectory, gains
+├── maio.m                             # Quick linear vs nonlinear comparison
+├── class_1_4_LQR_Design.m            # Part 1 — LQR simulation (3 variants)
+├── class_2_Lyapunov_Design.m         # Part 2 — Lyapunov simulation
 │
 └── src/
-    ├── animateUAV.m              # 3D animation of UAV bodies in flight
-    ├── plotResults.m             # Comparative plots + performance metrics
-    ├── lyapunovCtrl.m            # Lyapunov control law
-    ├── quad_dynamics_linear.m    # Linearised quadrotor dynamics (ODE RHS)
-    └── quad_dynamics_nonlinear.m # Full nonlinear quadrotor dynamics (ODE RHS)
+    ├── animateUAV.m                   # Visualisation helper: 3D playback of simulation results
+    ├── plotResults.m                  # Plots + RMSE/ISE/ITAE metrics
+    ├── lyapunovCtrl.m                 # Lyapunov control law
+    ├── quad_dynamics_linear.m         # Linearised quadrotor ODE
+    └── quad_dynamics_nonlinear.m      # Full nonlinear quadrotor ODE
+│
+│  ── Part 3: Python (animation + planning) ────────────────────────────────────
+│
+└── competition/
+    ├── main.py                        # Option A — 5 free relay drones (animation)
+    ├── main_sombra.py                 # Option B — shadow drone + 4 free relays (animation)
+    ├── planeador.py                   # Planning core: union search, Dijkstra, Hungarian
+    ├── mapa.py                        # Map builder: STL → pillars → visibility graph
+    └── icuas26_1.stl                  # City world geometry (from ICUAS 2026 repo)
 ```
 
-`.asv` files are MATLAB autosaves and can be ignored.
+`.asv` files are MATLAB autosaves — safe to ignore.
 
 ---
 
-## Key Files — ICUAS 2026
+## Part 1 — Linear Control (LQR)
 
-### `init.m` — System Initialisation
-Configures all shared parameters used across simulations:
-- Drone physical constants: mass `m = 0.029 kg`, gravity `g = 9.81 m/s²`, damping `b = 0.001`
-- LQR weighting matrices `Q` and `R` for each controller variant
-- Lyapunov gains `Kp` and `Kv`
-- Spiral trajectory generation (position, velocity, and acceleration sampled analytically)
-- Plot aesthetics: Times New Roman, LaTeX interpreters, custom colour palette
+**Entry point:** `class_1_4_LQR_Design.m`
 
-### `class_1_4_LQR_Design.m` — LQR Simulation
-Runs three parallel control loops over the same spiral trajectory:
-1. **Linear LQR** — feedback law `u = −K_lin · (x − x_d)` integrated with `quad_dynamics_linear`
-2. **Nonlinear LQR** — same gain structure applied to `quad_dynamics_nonlinear`
-3. **Error-Space LQR** — error state `e = x − x_d` fed directly into `u = −K_ES · e`
+Three LQR variants are compared on the same spiral trajectory:
 
-All loops use **forward Euler** integration with timestep `dt`. Results are collected in a `models` struct and passed to `plotResults` and `animateUAV`.
+| Variant | Plant | Control Law |
+|---|---|---|
+| Linear LQR | Linearised dynamics | `u = −K_lin · (x − x_d)` |
+| Nonlinear LQR | Full nonlinear dynamics | Same gain `K_lin` on nonlinear plant |
+| Error-Space LQR | Linearised dynamics | `u = −K_ES · e`, `e = x − x_d` |
 
-### `class_2_Lyapunov_Design.m` — Lyapunov Simulation
-Applies the Lyapunov-based controller alongside the LQR variants for direct comparison. The control law is:
-
-```
-u = −Kp · ep − Kv · ev + u_ff
-```
-
-where `ep` and `ev` are position and velocity errors and `u_ff` is the feedforward acceleration. Stability is guaranteed by the Lyapunov candidate `V = eᵀe`, which is negative-definite when `Kv > I`.
-
-### `src/quad_dynamics_nonlinear.m` — Nonlinear Model
-Converts control acceleration commands into thrust and Euler angles, builds the full ZYX rotation matrix, and returns the 6-DOF state derivative `[ṗ; v̇]` in the inertial frame.
-
-### `src/quad_dynamics_linear.m` — Linearised Model
-Same interface as the nonlinear model but uses small-angle approximations, making it suitable for LQR gain synthesis around the hover equilibrium.
-
-### `src/plotResults.m` — Results & Metrics
-Generates all figures used in the ICUAS 2026 report:
-- 3D trajectory comparison
-- Position and velocity time-series (per axis)
-- Control inputs with hardware saturation limits (±10° angles, 0.588 N thrust)
-- Per-axis tracking error with 3σ bounds
-- Error norm over time
-- Performance table: **RMSE, ISE, ITAE, peak error** for every controller
+All use forward Euler integration. The shared spiral reference (1 m radius, 2 revolutions, 10 s, +0.1 m/s ascent) and all gains are configured in `init.m`. `src/plotResults.m` generates comparative figures and performance tables; `src/animateUAV.m` plays back the simulation as a 3D visualisation.
 
 ---
 
-## How the Animation Works
+## Part 2 — Nonlinear Control (Lyapunov)
 
-The animation is produced by `src/animateUAV.m`. It receives:
+**Entry point:** `class_2_Lyapunov_Design.m`
 
-| Argument | Contents |
-|---|---|
-| `models` | Struct array — one entry per controller, with state history `x`, control history `u`, colour, and name |
-| `t` | Time vector |
-| `ref` | Reference trajectory struct with position array `ref.p` |
-
-### Step-by-step
-
-**1. Scene setup**  
-A single 3D axes is created with equal aspect ratio. Each model gets two graphics handles: a **body line** (solid, controller colour) and a **trajectory trail** (dashed).  The reference path is drawn once as a static black dashed line.
-
-**2. UAV geometry**  
-The quadrotor is represented as a **cross of four arms** of length 0.25 m, stored as an 8-point line in body frame:
-
-```
-body = [ 0   0  0;   +arm 0 0;   0 0 0;   -arm 0 0;
-         0   0  0;   0  +arm 0;  0 0 0;   0  -arm 0 ]
-```
-
-**3. Attitude reconstruction (per frame)**  
-At each timestep `i` (sampled every 5 steps for speed), the function reconstructs roll `φ` and pitch `θ` from the control input:
-
-- **Lyapunov**: acceleration vector `a = u + [0; 0; mg]` → thrust direction `b₃ = a/‖a‖` → exact angles via `atan2`
-- **LQR**: small-angle linearisation — `φ = u₁/T`, `θ = −u₂/T` where `T = u₃ + mg`
-
-Yaw `ψ` is fixed at zero (the control design assumption).
-
-**4. Rotation and translation**  
-The ZYX rotation matrix `R = Rz · Ry · Rx` is applied to every arm vertex, then the drone position `p(i)` is added:
-
-```matlab
-P = (R * body')' + p;
-```
-
-**5. Graphics update**  
-`set(hBody, 'XData', ..., 'YData', ..., 'ZData', ...)` updates the body cross in place.  
-`set(hTraj, ...)` extends the trajectory trail up to timestep `i`.  
-`drawnow limitrate` + `pause(0.06 s)` paces the playback.
-
-The result is a real-time 3D animation showing every controller's UAV simultaneously — each in its own colour — banking and pitching correctly as it follows the spiral.
-
----
-
-## Controller Designs
-
-### LQR (Linear Quadratic Regulator)
-
-The state vector is `x = [px, py, pz, vx, vy, vz]ᵀ`. The gain matrix `K` is computed via MATLAB's `lqr()` on the linearised double-integrator model. Three formulations are compared:
-
-- **Linear** — applies `K` to the full linearised plant
-- **Nonlinear** — applies the same `K` to the nonlinear plant (robustness test)
-- **Error-space** — tracks the error state directly, equivalent to an integral-like formulation around the reference
-
-### Lyapunov Controller
-
-Designed using the candidate function `V = eᵀe`. The control law:
+A Lyapunov tracking controller is derived from the candidate `V = eᵀe`:
 
 ```
 u = −Kp · ep − Kv · ev + a_ff
 ```
 
-guarantees `V̇ < 0` when `Kv > I`, providing **global asymptotic stability** for the position error dynamics. Feedforward acceleration `a_ff` cancels the known trajectory curvature.
+`ep` and `ev` are position and velocity errors; `a_ff` is feedforward acceleration. The derivative:
+
+```
+V̇ = −epᵀ Kp ep − evᵀ (Kv − I) ev < 0   when Kv > I
+```
+
+guarantees global asymptotic stability. The controller runs alongside the LQR variants for direct comparison (RMSE, ISE, ITAE, peak error).
 
 ---
 
-## Running the Simulation
+## Part 3 — ICUAS-Inspired Planning
 
-**Requirements:** MATLAB R2021a or later (no additional toolboxes required beyond Control System Toolbox for `lqr()`).
+> **This section is entirely independent from Parts 1 and 2.** All code here is Python. The animation, the planning algorithm, and the map files all belong to this part.
 
-```matlab
-% 1. Initialise parameters and trajectory
-init
+### Competition Scenario
 
-% 2a. Run LQR comparison (linear / nonlinear / error-space)
-class_1_4_LQR_Design
+The [ICUAS 2026 UAV Competition](https://github.com/larics/icuas26_competition) poses the following problem:
 
-% 2b. Run Lyapunov comparison
-class_2_Lyapunov_Design
+- A ground rover navigates an **urban obstacle field**
+- A team of **Crazyflie drones** must maintain an unbroken **relay chain** from a fixed base station to the rover
+- No direct base-to-rover link is allowed — the chain must pass through intermediate UAVs
+- Evaluation: connectivity uptime, CBRNe threat identification, mission time
 
-% 3. (Optional) Quick nonlinear vs linear comparison
-maio
+For this project the scenario is simplified: the rover path is fully known in advance, and the focus is exclusively on the **relay planning and animation** problem.
+
+---
+
+### Planning Algorithm
+
+**Files:** `mapa.py`, `planeador.py`
+
+**1. Map construction (`mapa.py`)**  
+The city's 3D mesh (`icuas26_1.stl`) is sliced at z = 1 m to extract obstacle pillar footprints. Pillars are clustered and navigation nodes are generated around each at a 0.40 m clearance margin. A visibility graph connects all node pairs with clear line-of-sight.
+
+**2. Relay corridor (`mapa.py → corredor_lazy`)**  
+For each frame a lazy Dijkstra search finds the shortest node chain from base to the rover's current position. A sticky penalty (`PEN = 1.4`) keeps the corridor stable when the previous path is still valid, avoiding unnecessary replanning.
+
+**3. Drone assignment (`planeador.py → planear`)**  
+A union-search over a lookahead window (`L = 300` frames) selects target nodes covering the corridor now and in the near future (bracketing for upcoming turns). The Hungarian algorithm assigns drones to targets. An iterative Gauss-Seidel projection then enforces minimum separation (≥ 0.5 m) and obstacle clearance, while capping movement at `STEP = 0.1 m/frame` (v_max = 1.5 m/s).
+
+---
+
+### Option A: 5 Free Relay Drones
+
+**File:** `main.py`
+
+All **5 drones** are free agents. Each frame the planner places them along the relay corridor to span the full base-to-rover chain. No drone has a fixed role — the Hungarian assignment redistributes them every frame as needed.
+
+```
+Base ──[UAV 1]──[UAV 2]──[UAV 3]──[UAV 4]──[UAV 5]── Rover
 ```
 
-`plotResults` and `animateUAV` are called automatically at the end of each simulation script.
+The rover is the terminal node of the communication graph. If any link in the chain breaks, the relay is lost and the mission clock stops.
+
+**Outputs:** `drone_relay.mp4` (4K UHD, 60 fps, ~40 s), `drone_relay_t22s.png`
+
+---
+
+### Option B: Shadow Drone + 4 Free Relays
+
+**File:** `main_sombra.py`
+
+One **shadow drone** is locked directly above the rover at all times — it tracks the rover's position exactly (rover speed 0.5 m/s << v_max 1.5 m/s). The remaining **4 relay drones** only need to connect the base to the shadow, whose position is always known.
+
+```
+Base ──[UAV 1]──[UAV 2]──[UAV 3]──[UAV 4]──[Shadow]
+                                                ↕
+                                              Rover
+```
+
+The shadow guarantees rover connectivity without planning. The 4 relays run the same union-search corridor algorithm, but the target is the shadow (not the rover directly).
+
+**Output:** `drone_relay_sombra.mp4` (60 fps, ~40 s)
+
+---
+
+### What Changes Between Options
+
+| Aspect | Option A — 5 Free Relays | Option B — Shadow + 4 Relays |
+|---|---|---|
+| **Rover connection** | Planned: one relay must keep LOS to rover | Guaranteed: shadow is always above rover |
+| **Active drones** | 5, equal roles | 4 free + 1 shadow (distinct roles, distinct colours) |
+| **Planning scope** | Full base → rover corridor | Reduced base → shadow corridor |
+| **Planning complexity** | Higher — must always reach rover | Lower — terminal point is the shadow |
+| **Single point of failure** | None (any relay can bridge to rover) | Shadow drone (if lost, rover link breaks) |
+| **Max relay speed** | 1.5 m/s | Shadow: 0.5 m/s (rover-locked); relays: 1.5 m/s |
+| **Disconnections** | 0 (validated) | 0 (validated) |
+
+---
+
+### How the Animation Works
+
+Both animations use **Matplotlib `FuncAnimation`** rendered offline and exported via FFmpeg. They share the same architecture.
+
+**Step 1 — Offline simulation**  
+Before any rendering, `planear` / `planear_sombra` (in `planeador.py`) computes the full trajectory of every drone across all frames at 15 fps physics. This produces:
+- `FD[t]` — list of drone positions at frame `t`
+- `FR[t]` — communication graph: nodes, active edges, connected/broken flag
+
+**Step 2 — Frame subsampling**  
+The render selects every `stride`-th physics frame so the video duration matches the target (~40 s at 60 fps output).
+
+**Step 3 — Per-frame update**  
+Each rendered frame updates:
+- **Relay links** — a `LineCollection` drawn in navy blue when the chain is connected, deep red when broken
+- **Drone markers** — custom top-view quadrotor shape (body disc + 4 arms + 4 rotor discs at 45° increments) for relay drones; a diamond `◆` for the shadow drone in Option B
+- **Rover marker** — rectangular body + 4 wheel circles, rotated to match the rover's instantaneous heading
+- **Status overlays** — live simulation time, `● LINK ACTIVE / ✖ LINK BROKEN` badge, count of UAVs currently linked to the rover
+- **Bottom panel** — legend and simulation info (frame, time, relay status)
+
+**Option A** renders at **4K UHD** (3840×2160, 200 DPI). **Option B** is a lighter 1080p render used for faster iteration.
+
+---
+
+## Running the Code
+
+### Parts 1 & 2 — MATLAB
+
+Requirements: MATLAB R2021a+, Control System Toolbox.
+
+```matlab
+init                      % parameters and trajectory
+class_1_4_LQR_Design      % Part 1: LQR comparison
+class_2_Lyapunov_Design   % Part 2: Lyapunov comparison
+```
+
+`plotResults` and `animateUAV` are called automatically at the end of each script.
+
+---
+
+### Part 3 — Python
+
+Requirements: Python 3.10+, `numpy`, `matplotlib`, `scipy`, `ffmpeg` (system).
+
+```bash
+cd competition/
+
+# Option A — 5 free relay drones
+python main.py
+# → drone_relay.mp4, drone_relay_t22s.png
+
+# Option B — shadow drone + 4 free relays
+python main_sombra.py
+# → drone_relay_sombra.mp4
+```
+
+On first run `mapa.py` builds the map from `icuas26_1.stl` and saves a cache (`mapa_cache.pkl`). Subsequent runs load the cache instantly.
 
 ---
 
 ## Videos
 
-### Animation (MATLAB)
-> 3D MATLAB animation showing all controllers tracking the spiral trajectory simultaneously.
+### Option A — 5 Free Relay Drones
+> 5 Crazyflie drones planning their relay positions across the ICUAS 2026 city map to maintain connectivity from base to rover.
 
-https://github.com/user-attachments/assets/ANIMATION_VIDEO_ID
+https://github.com/user-attachments/assets/RELAY5_VIDEO_ID
 
-<!-- Replace ANIMATION_VIDEO_ID with the actual GitHub asset ID after uploading the video from /secretaria -->
+<!-- Upload drone_relay.mp4 and replace RELAY5_VIDEO_ID -->
+
+---
+
+### Option B — Shadow Drone + 4 Free Relays
+> Shadow drone locked above rover; 4 relay drones connect it back to the base.
+
+https://github.com/user-attachments/assets/SHADOW_VIDEO_ID
+
+<!-- Upload drone_relay_sombra.mp4 and replace SHADOW_VIDEO_ID -->
 
 ---
 
 ### Gazebo Simulation
-> ROS + Gazebo flight simulation of the Crazyflie executing the spiral trajectory under LQR control.
+> ROS 2 + Gazebo simulation of the ICUAS 2026 environment.
 
 https://github.com/user-attachments/assets/GAZEBO_VIDEO_ID
 
-<!-- Replace GAZEBO_VIDEO_ID with the actual GitHub asset ID after uploading the video from /secretaria -->
+<!-- Upload Gazebo video and replace GAZEBO_VIDEO_ID -->
 
 ---
 
 ## Report
 
-This repository is supplementary material for the ICUAS 2026 paper:
+Full report (PDF): **[INSERT REPORT LINK HERE]**
 
-> **[Paper title — to be filled in]**  
-> *[Authors]*  
-> International Conference on Unmanned Aircraft Systems (ICUAS) 2026
-
-Full report: **[INSERT REPORT LINK HERE]**
-
-The code, videos, and figures in this repository correspond directly to Section [X] (Simulation Results) of the report.
+| Report Section | Code |
+|---|---|
+| Section 1 — Linear Control | `class_1_4_LQR_Design.m`, `src/` |
+| Section 2 — Nonlinear Control | `class_2_Lyapunov_Design.m`, `src/lyapunovCtrl.m` |
+| Section 3 — ICUAS Planning | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py` |
 
 ---
 
-*Developed as part of the 23 UAVs project.*
+*Report 2 — Group 6 — Unmanned Aerial Vehicles 2025/2026*
