@@ -79,17 +79,17 @@ Project-UAVs-23-code/
 
 ---
 
-## Part 1 - Linear Control (LQR)
+## Part 1 — Linear Control (LQR)
 
 **Entry point:** `class_1_4_LQR_Design.m`
 
-Three LQR variants are compared on the same spiral trajectory:
+Three LQR variants are compared on the same spiral trajectory. Note that a desired acceleration feedforward term is added to the absolute and error-state formulations to eliminate tracking delay:
 
 | Variant | Plant | Control Law |
 |---|---|---|
-| Linear LQR | Linearized dynamics | `u = −K_lin · (x − x_d)` |
-| Nonlinear LQR | Full nonlinear dynamics | Same gain `K_lin` on nonlinear plant |
-| Error-Space LQR | Linearized dynamics | `u = −K_ES · e`, `e = x − x_d` |
+| Linear LQR | Linearized dynamics | $u = -K_{\text{lin}} (x - x_d) + a_{\text{desired}}$ |
+| Nonlinear LQR | Full nonlinear dynamics | Same gain $K_{\text{lin}}$ on nonlinear plant |
+| Error-Space LQR | Linearized dynamics | $u = -K_{\text{ES}} \tilde{x} + a_{\text{desired}}$, where $\tilde{x} = x - \bar{x}$ |
 
 All use forward Euler integration. The shared spiral reference (1 m radius, 2 revolutions, 10 s, +0.1 m/s ascent) and all gains are configured in `init.m`. `src/plotResults.m` generates comparative figures and performance tables; `src/animateUAV.m` plays back the simulation as a 3D visualization.
 
@@ -99,26 +99,19 @@ All use forward Euler integration. The shared spiral reference (1 m radius, 2 re
 
 **Entry point:** `class_2_Lyapunov_Design.m`
 
-A Lyapunov tracking controller is derived from the candidate (position and velocity errors `ep`, `ev`; `Kp`, `Kv` symmetric positive definite):
+A Lyapunov controller is derived from the candidate (using absolute position p and velocity v; where Kp, Kv are symmetric positive definite matrices):
 
-```
-V = ½ (epᵀ Kp ep + evᵀ ev)
-```
+$$V = \frac{1}{2} (p^T K_p p + v^T v)$$
 
-The implemented tracking law adds a feedforward acceleration `a_ff`:
+The implemented control law uses a feedback formulation to drive the states to the equilibrium:
 
-```
-u = −Kp · ep − Kv · ev + a_ff
-```
+$$u_a = -K_p p - K_v v$$
 
 Along the closed loop the cross terms cancel, leaving
 
-```
-V̇ = −evᵀ (d·I + Kv) ev ≤ 0     (d = drag coefficient, Kv ≻ 0)
-```
+$$\dot{V} = -v^T (d I + K_v) v \le 0$$
 
-so by **LaSalle's Invariance Principle** the error converges to zero: the equilibrium is **asymptotically stable** (locally, under the ±40° pitch/roll saturation used in simulation). The controller runs alongside the LQR variants for direct comparison (RMSE, ISE, ITAE, peak error), where it reaches the lowest RMSE/ISE/ITAE of all designs.
-
+so by **LaSalle's Invariance Principle** the state converges to zero: the equilibrium (p,v)=(0,0) is **asymptotically stable** (locally, under the ±40° pitch/roll saturation used in simulation). The controller runs alongside the LQR variants for direct comparison (RMSE, ISE, ITAE, peak error), where it reaches the lowest RMSE/ISE/ITAE of all designs.
 ---
 
 ## Part 3 - ICUAS-Inspired Planning
