@@ -79,7 +79,7 @@ Project-UAVs-23-code/
 
 ---
 
-## Part 1 — Linear Control (LQR)
+## Part 1 - Linear Control (LQR)
 
 **Entry point:** `class_1_4_LQR_Design.m`
 
