@@ -112,6 +112,7 @@ Along the closed loop the cross terms cancel, leaving
 $$\dot{V} = -v^T (d I + K_v) v \le 0$$
 
 so by **LaSalle's Invariance Principle** the state converges to zero: the equilibrium (p,v)=(0,0) is **asymptotically stable** (locally, under the ±40° pitch/roll saturation used in simulation). The controller runs alongside the LQR variants for direct comparison (RMSE, ISE, ITAE, peak error), where it reaches the lowest RMSE/ISE/ITAE of all designs.
+
 ---
 
 ## Part 3 - ICUAS-Inspired Planning
@@ -172,7 +173,7 @@ The rover is the terminal node of the communication graph. If any link in the ch
 One **shadow drone** is locked directly above the rover at all times - it tracks the rover's position exactly (rover speed 0.5 m/s << v_max 1.5 m/s). The remaining **4 relay drones** only need to connect the base to the shadow, whose position is always known.
 
 ```
-Base ──[UAV 1]──[UAV 2]──[UAV 3]──[UAV 4]──[Shadow]
+Base ── [UAV 1]──[UAV 2]──[UAV 3]──[UAV 4]──[Shadow]
                                                 ↕
                                               Rover
 ```
