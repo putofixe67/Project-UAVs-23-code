@@ -1,5 +1,16 @@
-function animateUAV(models, t, ref)
-figure('Color','w');
+function animateUAV(models, t, ref, outputDir)
+if nargin < 4 || isempty(outputDir)
+    outputDir = '';
+    saveGif = false;
+else
+    saveGif = true;
+    if ~isfolder(outputDir), mkdir(outputDir); end
+    gifFile   = fullfile(outputDir, 'UAV_Animation.gif');
+    gifDelay  = 1/15;   % ~15 fps
+    firstFrame = true;
+end
+
+figure('Color','w', 'Position',[100 100 700 560]);
 ax = axes;
 hold(ax,'on'); grid(ax,'on'); box(ax,'on');
 axis equal;
@@ -38,9 +49,11 @@ plot3(ax,ref.p(:,1),ref.p(:,2),ref.p(:,3),'k--','LineWidth',1.5,'DisplayName','R
 legend(ax,'Location','best');
 
 % ==========================================================
-% Animation loop
+% Animation loop  (step=10 when saving to keep GIF small)
 % ==========================================================
-for i = 1:5:length(t)
+step = 5;
+if saveGif, step = 10; end
+for i = 1:step:length(t)
     for k = 1:nModels
         
         % ======================================================
@@ -108,7 +121,23 @@ for i = 1:5:length(t)
         set(hTraj(k), 'XData', models(k).x(1:i,1), 'YData', models(k).x(1:i,2), 'ZData', models(k).x(1:i,3));
     end
     
-    drawnow limitrate;
-    pause(0.06); % Adjusted down slightly since loop overhead takes time
+    if saveGif
+        drawnow;
+        frame = getframe(gcf);
+        [imind, cm] = rgb2ind(frame2im(frame), 256);
+        if firstFrame
+            imwrite(imind, cm, gifFile, 'gif', 'Loopcount',inf, 'DelayTime',gifDelay);
+            firstFrame = false;
+        else
+            imwrite(imind, cm, gifFile, 'gif', 'WriteMode','append', 'DelayTime',gifDelay);
+        end
+    else
+        drawnow limitrate;
+        pause(0.06);
+    end
+end
+
+if saveGif
+    fprintf('Animation saved: %s\n', gifFile);
 end
 end

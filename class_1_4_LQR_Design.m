@@ -1,137 +1,102 @@
 clear; close all; clc;
 
-%% ===============================================
-%  ---              LQR Design            ---
-% ================================================
+%% ===============================================================
+%  LQR Design  –  Point 1.4
+%  Generates three figure sets + two animations:
+%    figures/lqr/feedforward/  – effect of v_d / a_d feedforward
+%    figures/lqr/tuning/       – effect of Q/R tuning
+%    figures/lqr/full/         – full results (Nonlinear, ES, Linear)
+% ===============================================================
 
 addpath("src\");
 init();
 
-x_nl = zeros(N,6);
-x_lin = zeros(N,6);
-
-xLQR_ES = zeros(N,6);
-x_error = zeros(N,6);
-
-u_nl = zeros(3,N);
-u_lin = zeros(3,N);
-
-uLQR_ES = zeros(3,N);
-u_error = zeros(3,N);
-
-% ==================
-% ---  Linear ---
-% ==================
-
-for k = 1:N-1
-
-    if USE_V_DESIRED
-        xd = [p_desired(k,:)'; v_desired(k,:)'];
-    else
-        xd = [p_desired(k,:)'; 0; 0; 0];
-    end
-    
-    xk = x_lin(k,:)';
-    
-    uk = -K_lin*(xk - xd);
-    if USE_A_DESIRED
-        uk = uk + a_desired(k,:)';
-    end
-
-    u_lin(:, k) = uk;
-    xdot = quad_dynamics_linear(xk, m, g, uk);
-    x_lin(k+1,:) = xk' + dt*xdot';
-end
-
-u_lin(:, N) = u_lin(:, N-1);
-
-% ==================
-% --- Nonlinear ---
-% ==================
-
-for k = 1:N-1
-  
-    % Reference for the desired state
-    if USE_V_DESIRED
-        xd = [p_desired(k,:)'; v_desired(k,:)'];
-    else
-        xd = [p_desired(k,:)'; 0; 0; 0];
-    end
-    
-    xk = x_nl(k,:)';
-    
-    % Control law
-    uk = -K_nl*(xk - xd);
-    if USE_A_DESIRED
-        uk = uk + a_desired(k,:)';
-    end
-    
-    u_nl(:, k) = uk;
-
-    xdot = quad_dynamics_nonlinear(xk, m, g, uk);
-    x_nl(k+1,:) = xk' + dt*xdot';
-end
-
-u_nl(:, N) = u_nl(:, N-1);
-
-% ===================================
-% --- LQR Error Space Execution ---
-% ===================================
-
-for k = 1:N-1
-
-    if USE_V_DESIRED
-        xd = [p_desired(k,:)'; v_desired(k,:)'];
-    else
-        xd = [p_desired(k,:)'; 0; 0; 0];
-    end
-
-    xk = xLQR_ES(k,:)';
-
-    ek = xk - xd;
-    x_error(k,:) = ek';
-
-    uk = -K_LQR_ES * ek;
-
-    if USE_A_DESIRED
-        uk = uk + a_desired(k,:)';
-    end
-
-    uLQR_ES(:, k) = uk;
-
-    xdot = quad_dynamics_nonlinear(xk, m, g, uk);
-    xLQR_ES(k+1,:) = xk' + dt * xdot';
-end
-
-uLQR_ES(:, N) = uLQR_ES(:, N-1);
-
-%% ==========================================
-% Data structures to simplicity
-
-models(1).sysConsts = [m, g, d];
-models(1).name = 'LQR Nonlinear model';
-models(1).x    = x_nl;
-models(1).u    = u_nl*m;
-models(1).color = COL(1,:);
-
-models(2).sysConsts = [m, g, d];
-models(2).name = 'LQR Nonlinear model ES';
-models(2).x    = xLQR_ES;
-models(2).u    = uLQR_ES*m;
-models(2).color = COL(2,:);
-
-models(3).sysConsts = [m, g, d];
-models(3).name = 'LQR Linear model';
-models(3).x    = x_lin;
-models(3).u    = u_lin*m;
-models(3).color = COL(3,:);
-
 ref.p = p_desired;
 ref.v = v_desired;
 ref.a = a_desired;
-% ==========================================
 
-% ==========================================
-% PLOTS
-% ==========================================
-plotResults(models, t, ref,["Position", "Velocity", "Inputs", "PositionError", "VelocityError"]);
+%% ============================================================
+%  PART 1 – FEEDFORWARD COMPARISON
+%  LQR Nonlinear with 3 feedforward configurations
+% ============================================================
+ff_configs = [false false;   % No feedforward
+              true  false;   % v_desired only
+              true  true ];  % Full feedforward (v + a)
+ff_names   = {'No Feedforward', 'v_{d} only', 'Full (v_{d} + a_{d})'};
+
+for j = 1:3
+    [xj, uj] = simulate_lqr(K_nl, @quad_dynamics_nonlinear, N, dt, ...
+        p_desired, v_desired, a_desired, m, g, ff_configs(j,1), ff_configs(j,2));
+    ff_models(j).sysConsts = [m, g, d];
+    ff_models(j).name      = ff_names{j};
+    ff_models(j).x         = xj;
+    ff_models(j).u         = uj * m;
+    ff_models(j).color     = COL(j,:);
+end
+
+outDir_ff = fullfile('figures', 'lqr', 'feedforward');
+plotResults(ff_models, t, ref, ...
+    ["Position", "PositionError", "VelocityError", "ErrorNorm"], outDir_ff);
+animateUAV(ff_models, t, ref, outDir_ff);
+
+%% ============================================================
+%  PART 2 – Q/R TUNING COMPARISON
+%  LQR Nonlinear, full feedforward: untuned vs tuned
+% ============================================================
+A_base    = [zeros(3,3), eye(3); zeros(3,3), -d*eye(3)];
+B_base    = [zeros(3,3); eye(3)];
+K_untuned = lqr(ss(A_base, B_base, eye(6), 0), 10*eye(6), 8.5*eye(3));
+
+[x_un, u_un] = simulate_lqr(K_untuned, @quad_dynamics_nonlinear, N, dt, ...
+    p_desired, v_desired, a_desired, m, g, true, true);
+[x_tu, u_tu] = simulate_lqr(K_nl, @quad_dynamics_nonlinear, N, dt, ...
+    p_desired, v_desired, a_desired, m, g, true, true);
+
+tuning_models(1).sysConsts = [m, g, d];
+tuning_models(1).name      = 'Untuned Q/R';
+tuning_models(1).x         = x_un;
+tuning_models(1).u         = u_un * m;
+tuning_models(1).color     = COL(3,:);
+
+tuning_models(2).sysConsts = [m, g, d];
+tuning_models(2).name      = 'Tuned Q/R';
+tuning_models(2).x         = x_tu;
+tuning_models(2).u         = u_tu * m;
+tuning_models(2).color     = COL(1,:);
+
+outDir_tuning = fullfile('figures', 'lqr', 'tuning');
+plotResults(tuning_models, t, ref, ...
+    ["Position", "Inputs", "PositionError", "VelocityError"], outDir_tuning);
+
+%% ============================================================
+%  PART 3 – FULL LQR RESULTS (Tuned + Both FF)
+%  Nonlinear, Error-Space Nonlinear, Linear
+%  (This models struct is also used by class_2_Lyapunov_Design)
+% ============================================================
+[x_es,  u_es ] = simulate_lqr(K_LQR_ES, @quad_dynamics_nonlinear, N, dt, ...
+    p_desired, v_desired, a_desired, m, g, true, true);
+[x_lin, u_lin] = simulate_lqr(K_lin, @quad_dynamics_linear, N, dt, ...
+    p_desired, v_desired, a_desired, m, g, true, true);
+
+models(1).sysConsts = [m, g, d];
+models(1).name      = 'LQR Nonlinear';
+models(1).x         = x_tu;
+models(1).u         = u_tu * m;
+models(1).color     = COL(1,:);
+
+models(2).sysConsts = [m, g, d];
+models(2).name      = 'LQR Nonlinear ES';
+models(2).x         = x_es;
+models(2).u         = u_es * m;
+models(2).color     = COL(2,:);
+
+models(3).sysConsts = [m, g, d];
+models(3).name      = 'LQR Linear';
+models(3).x         = x_lin;
+models(3).u         = u_lin * m;
+models(3).color     = COL(3,:);
+
+outDir_full = fullfile('figures', 'lqr', 'full');
+plotResults(models, t, ref, ...
+    ["Position", "Velocity", "Inputs", "PositionError", "VelocityError"], outDir_full);
+animateUAV(models, t, ref, outDir_full);

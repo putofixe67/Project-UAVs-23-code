@@ -10,7 +10,11 @@
 1. [Project Overview](#project-overview)
 2. [Repository Structure](#repository-structure)
 3. [Part 1 - Linear Control (LQR)](#part-1--linear-control-lqr)
+   - [Effect of Feedforward Terms](#effect-of-feedforward-terms)
+   - [LQR Variants Comparison](#lqr-variants-comparison)
+   - [Tuning Effect](#tuning-effect)
 4. [Part 2 - Nonlinear Control (Lyapunov)](#part-2--nonlinear-control-lyapunov)
+   - [Performance Results](#performance-results)
 5. [Part 3 - ICUAS-Inspired Planning](#part-3--icuas-inspired-planning)
    - [Competition Scenario](#competition-scenario)
    - [Planning Algorithm](#planning-algorithm)
@@ -83,7 +87,7 @@ Project-UAVs-23-code/
 
 **Entry point:** `class_1_4_LQR_Design.m`
 
-Three LQR variants are compared on the same spiral trajectory. Note that a desired acceleration feedforward term is added to the absolute and error-state formulations to eliminate tracking delay:
+Three LQR variants are compared on the same spiral trajectory. A desired velocity and acceleration feedforward term is added to eliminate tracking delay:
 
 | Variant | Plant | Control Law |
 |---|---|---|
@@ -91,7 +95,55 @@ Three LQR variants are compared on the same spiral trajectory. Note that a desir
 | Nonlinear LQR | Full nonlinear dynamics | Same gain $K_{\text{lin}}$ on nonlinear plant |
 | Error-Space LQR | Linearized dynamics | $u = -K_{\text{ES}} \tilde{x} + a_{\text{desired}}$, where $\tilde{x} = x - \bar{x}$ |
 
-All use forward Euler integration. The shared spiral reference (1 m radius, 2 revolutions, 10 s, +0.1 m/s ascent) and all gains are configured in `init.m`. `src/plotResults.m` generates comparative figures and performance tables; `src/animateUAV.m` plays back the simulation as a 3D visualization.
+All use forward Euler integration. The shared spiral reference (1 m radius, 2 revolutions, 10 s, +0.1 m/s ascent) and all gains are configured in `init.m`.
+
+### Effect of Feedforward Terms
+
+Without feedforward terms the controller tracks only position, causing a persistent delay and radial offset along the spiral. Adding the desired velocity $v_d$ reduces the offset; adding both $v_d$ and $a_d$ nearly eliminates it.
+
+![3D Trajectory — Feedforward Comparison](src/figures/lqr/feedforward/3D_Trajectory.png)
+
+*3D trajectory: No Feedforward (blue), $v_d$ only (green), Full $v_d + a_d$ (red).*
+
+![Position Error — Feedforward Comparison](src/figures/lqr/feedforward/Position_Error.png)
+
+*Position error per axis. The no-feedforward case (blue) shows large sustained offset; both feedforward terms (red) keeps error within the $3\sigma$ bound throughout.*
+
+![Velocity Error — Feedforward Comparison](src/figures/lqr/feedforward/Velocity_Error.png)
+
+---
+
+### LQR Variants Comparison
+
+With full feedforward the three LQR formulations track closely. The linearized model gives a marginally lower error since the gain was computed on it; the error-space formulation is numerically identical to the nonlinear variant.
+
+![3D Trajectory — LQR Variants](src/figures/lqr/full/3D_Trajectory.png)
+
+*LQR Nonlinear (blue), LQR Nonlinear ES (green), LQR Linear (red).*
+
+![Position Error — LQR Variants](src/figures/lqr/full/Position_Error.png)
+
+![Velocity Error — LQR Variants](src/figures/lqr/full/Velocity_Error.png)
+
+### UAV Animations — Part 1
+
+<img src="src/figures/lqr/feedforward/UAV_Animation.gif" width="49%"/> <img src="src/figures/lqr/full/UAV_Animation.gif" width="49%"/>
+
+*Left: feedforward effect (no FF / $v_d$ only / full $v_d+a_d$). Right: LQR variants (nonlinear / nonlinear ES / linear).*
+
+---
+
+### Tuning Effect
+
+Default identity weights ($Q = I_6$, $R = I_3$) leave significant radial error. After tuning ($Q_{11}=Q_{22}=Q_{44}=38$, $R = 8.5\,I_3$) the spiral is tracked much more tightly with the same controller structure.
+
+![3D Trajectory — Tuning Effect](src/figures/lqr/tuning/3D_Trajectory.png)
+
+*Untuned Q/R (red) vs Tuned Q/R (blue).*
+
+![Position Error — Tuning Effect](src/figures/lqr/tuning/Position_Error.png)
+
+![Velocity Error — Tuning Effect](src/figures/lqr/tuning/Velocity_Error.png)
 
 ---
 
@@ -111,7 +163,40 @@ Along the closed loop the cross terms cancel, leaving
 
 $$\dot{V} = -v^T (d I + K_v) v \le 0$$
 
-so by **LaSalle's Invariance Principle** the state converges to zero: the equilibrium (p,v)=(0,0) is **asymptotically stable** (locally, under the ±40° pitch/roll saturation used in simulation). The controller runs alongside the LQR variants for direct comparison (RMSE, ISE, ITAE, peak error), where it reaches the lowest RMSE/ISE/ITAE of all designs.
+so by **LaSalle's Invariance Principle** the state converges to zero: the equilibrium $(p,v)=(0,0)$ is **asymptotically stable** (locally, under the ±40° pitch/roll saturation used in simulation).
+
+![3D Trajectory — Lyapunov vs LQR](src/figures/lyapunov/3D_Trajectory.png)
+
+*All tuned controllers: LQR Nonlinear (blue), LQR Nonlinear ES (green), LQR Linear (red), Lyapunov (purple).*
+
+![Position Error — Lyapunov vs LQR](src/figures/lyapunov/Position_Error.png)
+
+![Velocity Error — Lyapunov vs LQR](src/figures/lyapunov/Velocity_Error.png)
+
+![State Error Norm — Lyapunov vs LQR](src/figures/lyapunov/Error_Norm.png)
+
+*Error norm: the Lyapunov controller enters the $3\sigma$ band faster than all LQR variants despite a larger initial overshoot.*
+
+### UAV Animation — Part 2
+
+![UAV Animation — Lyapunov vs LQR](src/figures/lyapunov/UAV_Animation.gif)
+
+*All four tuned controllers simulated simultaneously on the spiral trajectory.*
+
+---
+
+### Performance Results
+
+Quantitative comparison with tuned gains (RMSE/ISE/ITAE over the full 10 s spiral):
+
+| Controller | RMSE [m] | ISE [m²·s] | ITAE [m·s²] | Peak [m] |
+|---|---|---|---|---|
+| LQR Nonlinear | 0.3691 | 1.3563 | 2.4503 | 1.1852 |
+| LQR Nonlinear ES | 0.3691 | 1.3563 | 2.4503 | 1.1852 |
+| LQR Linear | 0.3661 | 1.3342 | 2.2102 | 1.1852 |
+| **Lyapunov** | **0.3314** | **1.0923** | **1.5592** | **1.1852** |
+
+The Lyapunov controller achieves the lowest RMSE, ISE, and ITAE of all designs. The identical peak error across all controllers reflects the same initial conditions. The error-space and nonlinear LQR formulations are numerically equivalent for this trajectory.
 
 ---
 
@@ -323,11 +408,12 @@ If `crazyflie_interfaces` is not installed, the node runs in a logging-only mode
 
 Full report (PDF): **[INSERT REPORT LINK HERE]**
 
-| Report Section | Code |
-|---|---|
-| Section 1 - Linear Control | `class_1_4_LQR_Design.m`, `src/` |
-| Section 2 - Nonlinear Control | `class_2_Lyapunov_Design.m`, `src/lyapunovCtrl.m` |
-| Section 3 - ICUAS Planning | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py`, `render.py`, `ros2/` |
+| Report Section | Figures | Code |
+|---|---|---|
+| 1.4 — LQR feedforward effect | `src/figures/lqr/feedforward/` | `class_1_4_LQR_Design.m` |
+| 1.6 — LQR variants (ES) | `src/figures/lqr/full/` | `class_1_4_LQR_Design.m`, `src/` |
+| 2.2 — Lyapunov vs LQR (tuned) | `src/figures/lqr/tuning/`, `src/figures/lyapunov/` | `class_2_Lyapunov_Design.m`, `src/lyapunovCtrl.m` |
+| 3 — ICUAS Planning | — | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py`, `render.py`, `ros2/` |
 
 ---
 
