@@ -18,6 +18,7 @@
    - [Option B: Shadow Drone + 4 Free Relays](#option-b-shadow-drone--4-free-relays)
    - [What Changes Between Options](#what-changes-between-options)
    - [How the Animation Works](#how-the-animation-works)
+   - [ROS 2 / Gazebo Deployment](#ros-2--gazebo-deployment)
 6. [Running the Code](#running-the-code)
 7. [Videos](#videos)
 8. [Report](#report)
@@ -51,10 +52,10 @@ Project-UAVs-23-code/
 ├── class_2_Lyapunov_Design.m         # Part 2 — Lyapunov simulation
 │
 └── src/
-    ├── animateUAV.m                   # Visualisation helper: 3D playback of simulation results
+    ├── animateUAV.m                   # Visualization helper: 3D playback of simulation results
     ├── plotResults.m                  # Plots + RMSE/ISE/ITAE metrics
     ├── lyapunovCtrl.m                 # Lyapunov control law
-    ├── quad_dynamics_linear.m         # Linearised quadrotor ODE
+    ├── quad_dynamics_linear.m         # Linearized quadrotor ODE
     └── quad_dynamics_nonlinear.m      # Full nonlinear quadrotor ODE
 │
 │  ── Part 3: Python (animation + planning) ────────────────────────────────────
@@ -62,12 +63,19 @@ Project-UAVs-23-code/
 └── competition/
     ├── main.py                        # Option A — 5 free relay drones (animation)
     ├── main_sombra.py                 # Option B — shadow drone + 4 free relays (animation)
-    ├── planeador.py                   # Planning core: union search, Dijkstra, Hungarian
-    ├── mapa.py                        # Map builder: STL → pillars → visibility graph
-    └── icuas26_1.stl                  # City world geometry (from ICUAS 2026 repo)
+    ├── planeador.py                   # Planning core: union search, Hungarian, Gauss-Seidel projection
+    ├── mapa.py                        # Map builder: STL → pillars → visibility graph → lazy/sticky corridor
+    ├── render.py                      # Shared Matplotlib/FFmpeg renderer (both options)
+    ├── mapaperf.py                    # Static 2D map figure (obstacles, route, ArUco markers, landing pads)
+    ├── icuas26_1.stl                  # City world geometry (from ICUAS 2026 repo)
+    │
+    └── ros2/                          # ROS 2 / Crazyswarm2 deployment (Gazebo)
+        ├── exportar_trajetoria.py        # Export Option B plan → trajetoria_relay.npz
+        ├── exportar_trajetoria_5relay.py # Export Option A plan → trajetoria_relay_5.npz
+        └── relay_chain_node.py           # ROS 2 node: replays the plan on Crazyswarm2
 ```
 
-`.asv` files are MATLAB autosaves — safe to ignore.
+`.asv` files are MATLAB autosaves — safe to ignore. `mapa_cache.pkl` is generated on the first Python run and reused afterwards.
 
 ---
 
@@ -79,11 +87,11 @@ Three LQR variants are compared on the same spiral trajectory:
 
 | Variant | Plant | Control Law |
 |---|---|---|
-| Linear LQR | Linearised dynamics | `u = −K_lin · (x − x_d)` |
+| Linear LQR | Linearized dynamics | `u = −K_lin · (x − x_d)` |
 | Nonlinear LQR | Full nonlinear dynamics | Same gain `K_lin` on nonlinear plant |
-| Error-Space LQR | Linearised dynamics | `u = −K_ES · e`, `e = x − x_d` |
+| Error-Space LQR | Linearized dynamics | `u = −K_ES · e`, `e = x − x_d` |
 
-All use forward Euler integration. The shared spiral reference (1 m radius, 2 revolutions, 10 s, +0.1 m/s ascent) and all gains are configured in `init.m`. `src/plotResults.m` generates comparative figures and performance tables; `src/animateUAV.m` plays back the simulation as a 3D visualisation.
+All use forward Euler integration. The shared spiral reference (1 m radius, 2 revolutions, 10 s, +0.1 m/s ascent) and all gains are configured in `init.m`. `src/plotResults.m` generates comparative figures and performance tables; `src/animateUAV.m` plays back the simulation as a 3D visualization.
 
 ---
 
@@ -91,25 +99,31 @@ All use forward Euler integration. The shared spiral reference (1 m radius, 2 re
 
 **Entry point:** `class_2_Lyapunov_Design.m`
 
-A Lyapunov tracking controller is derived from the candidate `V = eᵀe`:
+A Lyapunov tracking controller is derived from the candidate (position and velocity errors `ep`, `ev`; `Kp`, `Kv` symmetric positive definite):
+
+```
+V = ½ (epᵀ Kp ep + evᵀ ev)
+```
+
+The implemented tracking law adds a feedforward acceleration `a_ff`:
 
 ```
 u = −Kp · ep − Kv · ev + a_ff
 ```
 
-`ep` and `ev` are position and velocity errors; `a_ff` is feedforward acceleration. The derivative:
+Along the closed loop the cross terms cancel, leaving
 
 ```
-V̇ = −epᵀ Kp ep − evᵀ (Kv − I) ev < 0   when Kv > I
+V̇ = −evᵀ (d·I + Kv) ev ≤ 0     (d = drag coefficient, Kv ≻ 0)
 ```
 
-guarantees global asymptotic stability. The controller runs alongside the LQR variants for direct comparison (RMSE, ISE, ITAE, peak error).
+so by **LaSalle's Invariance Principle** the error converges to zero: the equilibrium is **asymptotically stable** (locally, under the ±40° pitch/roll saturation used in simulation). The controller runs alongside the LQR variants for direct comparison (RMSE, ISE, ITAE, peak error), where it reaches the lowest RMSE/ISE/ITAE of all designs.
 
 ---
 
 ## Part 3 — ICUAS-Inspired Planning
 
-> **This section is entirely independent from Parts 1 and 2.** All code here is Python. The animation, the planning algorithm, and the map files all belong to this part.
+> **This section is entirely independent from Parts 1 and 2.** All code here is Python. The animation, the planning algorithm, the renderer, and the map files all belong to this part.
 
 ### Competition Scenario
 
@@ -129,13 +143,16 @@ For this project the scenario is simplified: the rover path is fully known in ad
 **Files:** `mapa.py`, `planeador.py`
 
 **1. Map construction (`mapa.py`)**  
-The city's 3D mesh (`icuas26_1.stl`) is sliced at z = 1 m to extract obstacle pillar footprints. Pillars are clustered and navigation nodes are generated around each at a 0.40 m clearance margin. A visibility graph connects all node pairs with clear line-of-sight.
+The city's 3D mesh (`icuas26_1.stl`) is sliced at z = 1 m to extract obstacle pillar footprints. Pillars are clustered, then navigation nodes are generated on a ring around each pillar at a 0.40 m clearance margin from the surface. A visibility graph connects two nodes whenever the segment between them keeps that same 0.40 m margin from every pillar.
 
-**2. Relay corridor (`mapa.py → corredor_lazy`)**  
-For each frame a lazy Dijkstra search finds the shortest node chain from base to the rover's current position. A sticky penalty (`PEN = 1.4`) keeps the corridor stable when the previous path is still valid, avoiding unnecessary replanning.
+**2. Relay corridor — lazy and sticky Dijkstra (`mapa.py → corredor_lazy`, `dijkstra_sticky`)**  
+For each frame the relay corridor is the shortest base→rover node chain. Two rules keep it stable instead of flickering between near-equal paths:
 
-**3. Drone assignment (`planeador.py → planear`)**  
-A union-search over a lookahead window (`L = 300` frames) selects target nodes covering the corridor now and in the near future (bracketing for upcoming turns). The Hungarian algorithm assigns drones to targets. An iterative Gauss-Seidel projection then enforces minimum separation (≥ 0.5 m) and obstacle clearance, while capping movement at `STEP = 0.1 m/frame` (v_max = 1.5 m/s).
+- **Lazy** — the previous corridor is reused for as long as it still works, i.e. every link in it stays clear *and* its deepest node still reaches the rover by radio. Dijkstra runs only when one of those fails. Because the rover moves a few cm per frame, this is rare: **49 replans over 2582 frames**.
+- **Sticky** — on a replan, `dijkstra_sticky` multiplies the weight of every edge that leaves the old corridor by `PEN = 1.4`, while on-corridor edges keep their true length. The new corridor stays close to the old one and only deviates where the geometry forces a genuinely shorter route.
+
+**3. Drone assignment (`planeador.py → planear` / `planear_sombra`)**  
+A union-search over a lookahead window (`L = 300` frames for Option A, `500` for Option B) selects target nodes covering the corridor now and in the near future (bracketing for upcoming turns). The Hungarian algorithm assigns drones to targets. An iterative Gauss-Seidel projection then enforces minimum separation (≥ 0.5 m) and obstacle clearance, while capping movement at `STEP = 0.1 m/frame` (v_max = 1.5 m/s).
 
 ---
 
@@ -167,9 +184,9 @@ Base ──[UAV 1]──[UAV 2]──[UAV 3]──[UAV 4]──[Shadow]
                                               Rover
 ```
 
-The shadow guarantees rover connectivity without planning. The 4 relays run the same union-search corridor algorithm, but the target is the shadow (not the rover directly).
+The shadow guarantees rover connectivity without planning. The 4 relays run the same union-search corridor algorithm, but the target is the shadow (not the rover directly). The shadow position is also passed to the Gauss-Seidel projection as a fixed point, so the relays stay ≥ 0.5 m from it as well.
 
-**Output:** `drone_relay_sombra.mp4` (60 fps, ~40 s)
+**Outputs:** `drone_relay_sombra.mp4` (4K UHD, 60 fps, ~40 s), `drone_relay_sombra_t22s.png`
 
 ---
 
@@ -178,9 +195,9 @@ The shadow guarantees rover connectivity without planning. The 4 relays run the 
 | Aspect | Option A — 5 Free Relays | Option B — Shadow + 4 Relays |
 |---|---|---|
 | **Rover connection** | Planned: one relay must keep LOS to rover | Guaranteed: shadow is always above rover |
-| **Active drones** | 5, equal roles | 4 free + 1 shadow (distinct roles, distinct colours) |
+| **Active drones** | 5, equal roles | 4 free + 1 shadow (distinct roles, distinct colors) |
 | **Planning scope** | Full base → rover corridor | Reduced base → shadow corridor |
-| **Planning complexity** | Higher — must always reach rover | Lower — terminal point is the shadow |
+| **Lookahead `L`** | 300 frames | 500 frames |
 | **Single point of failure** | None (any relay can bridge to rover) | Shadow drone (if lost, rover link breaks) |
 | **Max relay speed** | 1.5 m/s | Shadow: 0.5 m/s (rover-locked); relays: 1.5 m/s |
 | **Disconnections** | 0 (validated) | 0 (validated) |
@@ -189,7 +206,7 @@ The shadow guarantees rover connectivity without planning. The 4 relays run the 
 
 ### How the Animation Works
 
-Both animations use **Matplotlib `FuncAnimation`** rendered offline and exported via FFmpeg. They share the same architecture.
+Both animations are produced by the shared renderer **`render.py`**, using **Matplotlib `FuncAnimation`** rendered offline and exported via FFmpeg. The `shadow_mode` flag is the only difference between the two; it changes the markers and the corridor target, not the resolution.
 
 **Step 1 — Offline simulation**  
 Before any rendering, `planear` / `planear_sombra` (in `planeador.py`) computes the full trajectory of every drone across all frames at 15 fps physics. This produces:
@@ -201,13 +218,29 @@ The render selects every `stride`-th physics frame so the video duration matches
 
 **Step 3 — Per-frame update**  
 Each rendered frame updates:
-- **Relay links** — a `LineCollection` drawn in navy blue when the chain is connected, deep red when broken
-- **Drone markers** — custom top-view quadrotor shape (body disc + 4 arms + 4 rotor discs at 45° increments) for relay drones; a diamond `◆` for the shadow drone in Option B
+- **Relay links** — a dark-blue poly-line drawn between connected nodes. The connectivity state is reported by the status badge (`● LINK ACTIVE` in blue / `✖ LINK BROKEN` in red); the badge turns red if the chain ever breaks, which it does not in either validated run
+- **Drone markers** — a custom top-view quadrotor shape (body disc + 4 arms + 4 rotor discs in an X layout, at 45°, 135°, 225°, 315°) for relay drones; the **same quadrotor shape in purple** for the shadow drone in Option B
 - **Rover marker** — rectangular body + 4 wheel circles, rotated to match the rover's instantaneous heading
-- **Status overlays** — live simulation time, `● LINK ACTIVE / ✖ LINK BROKEN` badge, count of UAVs currently linked to the rover
-- **Bottom panel** — legend and simulation info (frame, time, relay status)
+- **Status overlays** — live simulation time, the `● LINK ACTIVE / ✖ LINK BROKEN` badge, and the count of UAVs currently linked to the rover (or to the shadow, in Option B)
+- **Right panel** — legend and simulation info (frame, time, relay status)
 
-**Option A** renders at **4K UHD** (3840×2160, 200 DPI). **Option B** is a lighter 1080p render used for faster iteration.
+Both options render at **4K UHD** (3840×2160, 200 DPI) through `render.py`. Lighter 1080p versions for the web are produced afterwards by a separate FFmpeg pass.
+
+---
+
+### ROS 2 / Gazebo Deployment
+
+**Folder:** `competition/ros2/`
+
+The offline plan can be replayed on the ROS 2 / Crazyswarm2 stack (Gazebo). The pipeline has two steps:
+
+1. **Export** the validated plan to a `.npz` file (positions, rover route, arc lengths, altitudes, limits):
+   - `exportar_trajetoria.py` → `trajetoria_relay.npz` (Option B: 4 relays + shadow)
+   - `exportar_trajetoria_5relay.py` → `trajetoria_relay_5.npz` (Option A: 5 free relays)
+   
+   Both apply the EMA smoothing (`suavizar`) so the Gazebo setpoints are smooth, and both assert zero disconnections before writing.
+
+2. **Replay** with `relay_chain_node.py`. Key detail: the relays are indexed by the rover's **arc-progress** along the known route (projection of the live rover pose onto the polyline → arc length → frame), **not** by absolute time. If Gazebo runs the rover faster or slower, the chain stays synchronized. With `modo=sombra` the node also commands the shadow drone to follow the live rover pose in real time; with `modo=livre` all 5 relays follow precomputed setpoints. Setpoints are published as `crazyflie_interfaces/Position` on `/<prefix><i>/cmd_position`.
 
 ---
 
@@ -227,7 +260,7 @@ class_2_Lyapunov_Design   % Part 2: Lyapunov comparison
 
 ---
 
-### Part 3 — Python
+### Part 3 — Python (animation)
 
 Requirements: Python 3.10+, `numpy`, `matplotlib`, `scipy`, `ffmpeg` (system).
 
@@ -240,10 +273,32 @@ python main.py
 
 # Option B — shadow drone + 4 free relays
 python main_sombra.py
-# → drone_relay_sombra.mp4
+# → drone_relay_sombra.mp4, drone_relay_sombra_t22s.png
 ```
 
-On first run `mapa.py` builds the map from `icuas26_1.stl` and saves a cache (`mapa_cache.pkl`). Subsequent runs load the cache instantly.
+On first run `mapa.py` builds the map from `icuas26_1.stl` and saves a cache (`mapa_cache.pkl`). Subsequent runs load the cache instantly. Delete `mapa_cache.pkl` to force a rebuild from the STL.
+
+---
+
+### Part 3 — ROS 2 / Gazebo (optional)
+
+Requirements: ROS 2 Humble, Crazyswarm2, the ICUAS 2026 Gazebo environment.
+
+```bash
+cd competition/ros2/
+
+# 1. export the offline plan (run once)
+python exportar_trajetoria.py          # Option B → trajetoria_relay.npz
+# python exportar_trajetoria_5relay.py # Option A → trajetoria_relay_5.npz
+
+# 2. replay on Crazyswarm2 (parameters shown with defaults)
+ros2 run <your_pkg> relay_chain_node --ros-args \
+  -p modo:=sombra \
+  -p traj_path:=trajetoria_relay.npz \
+  -p rover_odom_topic:=/AGV/pose
+```
+
+If `crazyflie_interfaces` is not installed, the node runs in a logging-only mode (it prints setpoints instead of publishing them), which is useful for a dry run.
 
 ---
 
@@ -252,9 +307,7 @@ On first run `mapa.py` builds the map from `icuas26_1.stl` and saves a cache (`m
 ### Option A — 5 Free Relay Drones
 > 5 Crazyflie drones planning their relay positions across the ICUAS 2026 city map to maintain connectivity from base to rover.
 
-[hPython 2D Animation (5 relay drones)](https://github.com/user-attachments/assets/9959c9e4-abb2-4fd3-8a33-7f2756ada750)
-
-<!-- Upload drone_relay.mp4 and replace RELAY5_VIDEO_ID -->
+[Python 2D Animation (5 relay drones)](https://github.com/user-attachments/assets/9959c9e4-abb2-4fd3-8a33-7f2756ada750)
 
 ---
 
@@ -263,16 +316,12 @@ On first run `mapa.py` builds the map from `icuas26_1.stl` and saves a cache (`m
 
 [Python 2D Animation (4 relays + shadow drone)](https://github.com/user-attachments/assets/b3317299-f46f-4617-acd5-371c7bf41e3d)
 
-<!-- Upload drone_relay_sombra.mp4 and replace SHADOW_VIDEO_ID -->
-
----- 
+---
 
 ### Gazebo Simulation
 > ROS 2 + Gazebo simulation of the ICUAS 2026 environment.
 
-[Gazebo 3D Animation (5 relay drones)](https://github.com/user-attachments/assets/30812cee-1844-43c5-882f-f7da6eb45c84 )
-
-<!-- Upload Gazebo video and replace GAZEBO_VIDEO_ID -->
+[Gazebo 3D Animation (5 relay drones)](https://github.com/user-attachments/assets/30812cee-1844-43c5-882f-f7da6eb45c84)
 
 ---
 
@@ -284,7 +333,7 @@ Full report (PDF): **[INSERT REPORT LINK HERE]**
 |---|---|
 | Section 1 — Linear Control | `class_1_4_LQR_Design.m`, `src/` |
 | Section 2 — Nonlinear Control | `class_2_Lyapunov_Design.m`, `src/lyapunovCtrl.m` |
-| Section 3 — ICUAS Planning | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py` |
+| Section 3 — ICUAS Planning | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py`, `render.py`, `ros2/` |
 
 ---
 
