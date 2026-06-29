@@ -252,7 +252,7 @@ On first run `mapa.py` builds the map from `icuas26_1.stl` and saves a cache (`m
 ### Option A — 5 Free Relay Drones
 > 5 Crazyflie drones planning their relay positions across the ICUAS 2026 city map to maintain connectivity from base to rover.
 
-https://github.com/user-attachments/assets/RELAY5_VIDEO_ID
+[hPython 2D Animation (5 relay drones)](https://github.com/user-attachments/assets/9959c9e4-abb2-4fd3-8a33-7f2756ada750)
 
 <!-- Upload drone_relay.mp4 and replace RELAY5_VIDEO_ID -->
 
@@ -261,16 +261,16 @@ https://github.com/user-attachments/assets/RELAY5_VIDEO_ID
 ### Option B — Shadow Drone + 4 Free Relays
 > Shadow drone locked above rover; 4 relay drones connect it back to the base.
 
-https://github.com/user-attachments/assets/SHADOW_VIDEO_ID
+[Python 2D Animation (4 relays + shadow drone)](https://github.com/user-attachments/assets/b3317299-f46f-4617-acd5-371c7bf41e3d)
 
 <!-- Upload drone_relay_sombra.mp4 and replace SHADOW_VIDEO_ID -->
 
----
+---- 
 
 ### Gazebo Simulation
 > ROS 2 + Gazebo simulation of the ICUAS 2026 environment.
 
-https://github.com/user-attachments/assets/GAZEBO_VIDEO_ID
+[Gazebo 3D Animation (5 relay drones)](https://github.com/user-attachments/assets/30812cee-1844-43c5-882f-f7da6eb45c84 )
 
 <!-- Upload Gazebo video and replace GAZEBO_VIDEO_ID -->
 
