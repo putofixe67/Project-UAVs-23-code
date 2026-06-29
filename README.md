@@ -1,4 +1,4 @@
-# Project UAVs — Report 2: Crazyflie Motion Control and Planning
+# Project UAVs - Report 2: Crazyflie Motion Control and Planning
 
 > **Course project** for Unmanned Aerial Vehicles 2025/2026.  
 > Group 6
@@ -9,9 +9,9 @@
 
 1. [Project Overview](#project-overview)
 2. [Repository Structure](#repository-structure)
-3. [Part 1 — Linear Control (LQR)](#part-1--linear-control-lqr)
-4. [Part 2 — Nonlinear Control (Lyapunov)](#part-2--nonlinear-control-lyapunov)
-5. [Part 3 — ICUAS-Inspired Planning](#part-3--icuas-inspired-planning)
+3. [Part 1 - Linear Control (LQR)](#part-1--linear-control-lqr)
+4. [Part 2 - Nonlinear Control (Lyapunov)](#part-2--nonlinear-control-lyapunov)
+5. [Part 3 - ICUAS-Inspired Planning](#part-3--icuas-inspired-planning)
    - [Competition Scenario](#competition-scenario)
    - [Planning Algorithm](#planning-algorithm)
    - [Option A: 5 Free Relay Drones](#option-a-5-free-relay-drones)
@@ -31,11 +31,11 @@ The project is divided into three independent parts:
 
 | Part | Topic | Language |
 |---|---|---|
-| 1 | Linear Control — LQR (absolute state, nonlinear plant, error-space) | MATLAB |
-| 2 | Nonlinear Control — Lyapunov stability-based controller | MATLAB |
+| 1 | Linear Control - LQR (absolute state, nonlinear plant, error-space) | MATLAB |
+| 2 | Nonlinear Control - Lyapunov stability-based controller | MATLAB |
 | 3 | Motion planning and animation inspired by ICUAS 2026 competition scenario | Python |
 
-Parts 1 and 2 are MATLAB simulations of a Crazyflie 2.1 (mass 29 g) tracking a spiral trajectory. **Part 3 is entirely separate**: it is a Python planning and animation exercise inspired by the ICUAS 2026 UAV Competition scenario, where drones must maintain a communication relay chain to a moving ground rover in an urban environment. The team did not participate in the competition — this is a course exercise.
+Parts 1 and 2 are MATLAB simulations of a Crazyflie 2.1 (mass 29 g) tracking a spiral trajectory. **Part 3 is entirely separate**: it is a Python planning and animation exercise inspired by the ICUAS 2026 UAV Competition scenario, where drones must maintain a communication relay chain to a moving ground rover in an urban environment. The team did not participate in the competition - this is a course exercise.
 
 ---
 
@@ -48,8 +48,8 @@ Project-UAVs-23-code/
 │
 ├── init.m                             # Parameters, trajectory, gains
 ├── maio.m                             # Quick linear vs nonlinear comparison
-├── class_1_4_LQR_Design.m            # Part 1 — LQR simulation (3 variants)
-├── class_2_Lyapunov_Design.m         # Part 2 — Lyapunov simulation
+├── class_1_4_LQR_Design.m            # Part 1 - LQR simulation (3 variants)
+├── class_2_Lyapunov_Design.m         # Part 2 - Lyapunov simulation
 │
 └── src/
     ├── animateUAV.m                   # Visualization helper: 3D playback of simulation results
@@ -61,8 +61,8 @@ Project-UAVs-23-code/
 │  ── Part 3: Python (animation + planning) ────────────────────────────────────
 │
 └── competition/
-    ├── main.py                        # Option A — 5 free relay drones (animation)
-    ├── main_sombra.py                 # Option B — shadow drone + 4 free relays (animation)
+    ├── main.py                        # Option A - 5 free relay drones (animation)
+    ├── main_sombra.py                 # Option B - shadow drone + 4 free relays (animation)
     ├── planeador.py                   # Planning core: union search, Hungarian, Gauss-Seidel projection
     ├── mapa.py                        # Map builder: STL → pillars → visibility graph → lazy/sticky corridor
     ├── render.py                      # Shared Matplotlib/FFmpeg renderer (both options)
@@ -75,11 +75,11 @@ Project-UAVs-23-code/
         └── relay_chain_node.py           # ROS 2 node: replays the plan on Crazyswarm2
 ```
 
-`.asv` files are MATLAB autosaves — safe to ignore. `mapa_cache.pkl` is generated on the first Python run and reused afterwards.
+`.asv` files are MATLAB autosaves - safe to ignore. `mapa_cache.pkl` is generated on the first Python run and reused afterwards.
 
 ---
 
-## Part 1 — Linear Control (LQR)
+## Part 1 - Linear Control (LQR)
 
 **Entry point:** `class_1_4_LQR_Design.m`
 
@@ -95,7 +95,7 @@ All use forward Euler integration. The shared spiral reference (1 m radius, 2 re
 
 ---
 
-## Part 2 — Nonlinear Control (Lyapunov)
+## Part 2 - Nonlinear Control (Lyapunov)
 
 **Entry point:** `class_2_Lyapunov_Design.m`
 
@@ -121,7 +121,7 @@ so by **LaSalle's Invariance Principle** the error converges to zero: the equili
 
 ---
 
-## Part 3 — ICUAS-Inspired Planning
+## Part 3 - ICUAS-Inspired Planning
 
 > **This section is entirely independent from Parts 1 and 2.** All code here is Python. The animation, the planning algorithm, the renderer, and the map files all belong to this part.
 
@@ -131,7 +131,7 @@ The [ICUAS 2026 UAV Competition](https://github.com/larics/icuas26_competition) 
 
 - A ground rover navigates an **urban obstacle field**
 - A team of **Crazyflie drones** must maintain an unbroken **relay chain** from a fixed base station to the rover
-- No direct base-to-rover link is allowed — the chain must pass through intermediate UAVs
+- No direct base-to-rover link is allowed - the chain must pass through intermediate UAVs
 - Evaluation: connectivity uptime, CBRNe threat identification, mission time
 
 For this project the scenario is simplified: the rover path is fully known in advance, and the focus is exclusively on the **relay planning and animation** problem.
@@ -145,11 +145,11 @@ For this project the scenario is simplified: the rover path is fully known in ad
 **1. Map construction (`mapa.py`)**  
 The city's 3D mesh (`icuas26_1.stl`) is sliced at z = 1 m to extract obstacle pillar footprints. Pillars are clustered, then navigation nodes are generated on a ring around each pillar at a 0.40 m clearance margin from the surface. A visibility graph connects two nodes whenever the segment between them keeps that same 0.40 m margin from every pillar.
 
-**2. Relay corridor — lazy and sticky Dijkstra (`mapa.py → corredor_lazy`, `dijkstra_sticky`)**  
+**2. Relay corridor - lazy and sticky Dijkstra (`mapa.py → corredor_lazy`, `dijkstra_sticky`)**  
 For each frame the relay corridor is the shortest base→rover node chain. Two rules keep it stable instead of flickering between near-equal paths:
 
-- **Lazy** — the previous corridor is reused for as long as it still works, i.e. every link in it stays clear *and* its deepest node still reaches the rover by radio. Dijkstra runs only when one of those fails. Because the rover moves a few cm per frame, this is rare: **49 replans over 2582 frames**.
-- **Sticky** — on a replan, `dijkstra_sticky` multiplies the weight of every edge that leaves the old corridor by `PEN = 1.4`, while on-corridor edges keep their true length. The new corridor stays close to the old one and only deviates where the geometry forces a genuinely shorter route.
+- **Lazy** - the previous corridor is reused for as long as it still works, i.e. every link in it stays clear *and* its deepest node still reaches the rover by radio. Dijkstra runs only when one of those fails. Because the rover moves a few cm per frame, this is rare: **49 replans over 2582 frames**.
+- **Sticky** - on a replan, `dijkstra_sticky` multiplies the weight of every edge that leaves the old corridor by `PEN = 1.4`, while on-corridor edges keep their true length. The new corridor stays close to the old one and only deviates where the geometry forces a genuinely shorter route.
 
 **3. Drone assignment (`planeador.py → planear` / `planear_sombra`)**  
 A union-search over a lookahead window (`L = 300` frames for Option A, `500` for Option B) selects target nodes covering the corridor now and in the near future (bracketing for upcoming turns). The Hungarian algorithm assigns drones to targets. An iterative Gauss-Seidel projection then enforces minimum separation (≥ 0.5 m) and obstacle clearance, while capping movement at `STEP = 0.1 m/frame` (v_max = 1.5 m/s).
@@ -160,7 +160,7 @@ A union-search over a lookahead window (`L = 300` frames for Option A, `500` for
 
 **File:** `main.py`
 
-All **5 drones** are free agents. Each frame the planner places them along the relay corridor to span the full base-to-rover chain. No drone has a fixed role — the Hungarian assignment redistributes them every frame as needed.
+All **5 drones** are free agents. Each frame the planner places them along the relay corridor to span the full base-to-rover chain. No drone has a fixed role - the Hungarian assignment redistributes them every frame as needed.
 
 ```
 Base ──[UAV 1]──[UAV 2]──[UAV 3]──[UAV 4]──[UAV 5]── Rover
@@ -176,7 +176,7 @@ The rover is the terminal node of the communication graph. If any link in the ch
 
 **File:** `main_sombra.py`
 
-One **shadow drone** is locked directly above the rover at all times — it tracks the rover's position exactly (rover speed 0.5 m/s << v_max 1.5 m/s). The remaining **4 relay drones** only need to connect the base to the shadow, whose position is always known.
+One **shadow drone** is locked directly above the rover at all times - it tracks the rover's position exactly (rover speed 0.5 m/s << v_max 1.5 m/s). The remaining **4 relay drones** only need to connect the base to the shadow, whose position is always known.
 
 ```
 Base ──[UAV 1]──[UAV 2]──[UAV 3]──[UAV 4]──[Shadow]
@@ -192,7 +192,7 @@ The shadow guarantees rover connectivity without planning. The 4 relays run the 
 
 ### What Changes Between Options
 
-| Aspect | Option A — 5 Free Relays | Option B — Shadow + 4 Relays |
+| Aspect | Option A - 5 Free Relays | Option B - Shadow + 4 Relays |
 |---|---|---|
 | **Rover connection** | Planned: one relay must keep LOS to rover | Guaranteed: shadow is always above rover |
 | **Active drones** | 5, equal roles | 4 free + 1 shadow (distinct roles, distinct colors) |
@@ -208,21 +208,21 @@ The shadow guarantees rover connectivity without planning. The 4 relays run the 
 
 Both animations are produced by the shared renderer **`render.py`**, using **Matplotlib `FuncAnimation`** rendered offline and exported via FFmpeg. The `shadow_mode` flag is the only difference between the two; it changes the markers and the corridor target, not the resolution.
 
-**Step 1 — Offline simulation**  
+**Step 1 - Offline simulation**  
 Before any rendering, `planear` / `planear_sombra` (in `planeador.py`) computes the full trajectory of every drone across all frames at 15 fps physics. This produces:
-- `FD[t]` — list of drone positions at frame `t`
-- `FR[t]` — communication graph: nodes, active edges, connected/broken flag
+- `FD[t]` - list of drone positions at frame `t`
+- `FR[t]` - communication graph: nodes, active edges, connected/broken flag
 
-**Step 2 — Frame subsampling**  
+**Step 2 - Frame subsampling**  
 The render selects every `stride`-th physics frame so the video duration matches the target (~40 s at 60 fps output).
 
-**Step 3 — Per-frame update**  
+**Step 3 - Per-frame update**  
 Each rendered frame updates:
-- **Relay links** — a dark-blue poly-line drawn between connected nodes. The connectivity state is reported by the status badge (`● LINK ACTIVE` in blue / `✖ LINK BROKEN` in red); the badge turns red if the chain ever breaks, which it does not in either validated run
-- **Drone markers** — a custom top-view quadrotor shape (body disc + 4 arms + 4 rotor discs in an X layout, at 45°, 135°, 225°, 315°) for relay drones; the **same quadrotor shape in purple** for the shadow drone in Option B
-- **Rover marker** — rectangular body + 4 wheel circles, rotated to match the rover's instantaneous heading
-- **Status overlays** — live simulation time, the `● LINK ACTIVE / ✖ LINK BROKEN` badge, and the count of UAVs currently linked to the rover (or to the shadow, in Option B)
-- **Right panel** — legend and simulation info (frame, time, relay status)
+- **Relay links** - a dark-blue poly-line drawn between connected nodes. The connectivity state is reported by the status badge (`● LINK ACTIVE` in blue / `✖ LINK BROKEN` in red); the badge turns red if the chain ever breaks, which it does not in either validated run
+- **Drone markers** - a custom top-view quadrotor shape (body disc + 4 arms + 4 rotor discs in an X layout, at 45°, 135°, 225°, 315°) for relay drones; the **same quadrotor shape in purple** for the shadow drone in Option B
+- **Rover marker** - rectangular body + 4 wheel circles, rotated to match the rover's instantaneous heading
+- **Status overlays** - live simulation time, the `● LINK ACTIVE / ✖ LINK BROKEN` badge, and the count of UAVs currently linked to the rover (or to the shadow, in Option B)
+- **Right panel** - legend and simulation info (frame, time, relay status)
 
 Both options render at **4K UHD** (3840×2160, 200 DPI) through `render.py`. Lighter 1080p versions for the web are produced afterwards by a separate FFmpeg pass.
 
@@ -246,7 +246,7 @@ The offline plan can be replayed on the ROS 2 / Crazyswarm2 stack (Gazebo). The 
 
 ## Running the Code
 
-### Parts 1 & 2 — MATLAB
+### Parts 1 & 2 - MATLAB
 
 Requirements: MATLAB R2021a+, Control System Toolbox.
 
@@ -260,18 +260,18 @@ class_2_Lyapunov_Design   % Part 2: Lyapunov comparison
 
 ---
 
-### Part 3 — Python (animation)
+### Part 3 - Python (animation)
 
 Requirements: Python 3.10+, `numpy`, `matplotlib`, `scipy`, `ffmpeg` (system).
 
 ```bash
 cd competition/
 
-# Option A — 5 free relay drones
+# Option A - 5 free relay drones
 python main.py
 # → drone_relay.mp4, drone_relay_t22s.png
 
-# Option B — shadow drone + 4 free relays
+# Option B - shadow drone + 4 free relays
 python main_sombra.py
 # → drone_relay_sombra.mp4, drone_relay_sombra_t22s.png
 ```
@@ -280,7 +280,7 @@ On first run `mapa.py` builds the map from `icuas26_1.stl` and saves a cache (`m
 
 ---
 
-### Part 3 — ROS 2 / Gazebo (optional)
+### Part 3 - ROS 2 / Gazebo (optional)
 
 Requirements: ROS 2 Humble, Crazyswarm2, the ICUAS 2026 Gazebo environment.
 
@@ -304,14 +304,14 @@ If `crazyflie_interfaces` is not installed, the node runs in a logging-only mode
 
 ## Videos
 
-### Option A — 5 Free Relay Drones
+### Option A - 5 Free Relay Drones
 > 5 Crazyflie drones planning their relay positions across the ICUAS 2026 city map to maintain connectivity from base to rover.
 
 [Python 2D Animation (5 relay drones)](https://github.com/user-attachments/assets/9959c9e4-abb2-4fd3-8a33-7f2756ada750)
 
 ---
 
-### Option B — Shadow Drone + 4 Free Relays
+### Option B - Shadow Drone + 4 Free Relays
 > Shadow drone locked above rover; 4 relay drones connect it back to the base.
 
 [Python 2D Animation (4 relays + shadow drone)](https://github.com/user-attachments/assets/b3317299-f46f-4617-acd5-371c7bf41e3d)
@@ -331,10 +331,10 @@ Full report (PDF): **[INSERT REPORT LINK HERE]**
 
 | Report Section | Code |
 |---|---|
-| Section 1 — Linear Control | `class_1_4_LQR_Design.m`, `src/` |
-| Section 2 — Nonlinear Control | `class_2_Lyapunov_Design.m`, `src/lyapunovCtrl.m` |
-| Section 3 — ICUAS Planning | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py`, `render.py`, `ros2/` |
+| Section 1 - Linear Control | `class_1_4_LQR_Design.m`, `src/` |
+| Section 2 - Nonlinear Control | `class_2_Lyapunov_Design.m`, `src/lyapunovCtrl.m` |
+| Section 3 - ICUAS Planning | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py`, `render.py`, `ros2/` |
 
 ---
 
-*Report 2 — Group 6 — Unmanned Aerial Vehicles 2025/2026*
+*Report 2 - Group 6 - Unmanned Aerial Vehicles 2025/2026*
