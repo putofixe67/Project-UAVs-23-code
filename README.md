@@ -113,7 +113,7 @@ All use forward Euler integration. The shared spiral reference (1 m radius, 2 re
   <img src="matlab/figures/lqr/full/UAV_Animation.gif" width="55%"/>
 </p>
 
-*LQR variants: Nonlinear (blue), Nonlinear ES (green), Linear (red). Nonlinear and ES overlap — they are numerically identical on this trajectory.*
+*LQR variants: Nonlinear (blue), Nonlinear ES (green), Linear (red). Nonlinear and ES overlap - they are numerically identical on this trajectory.*
 
 ---
 
@@ -370,10 +370,10 @@ Full report (PDF): **[INSERT REPORT LINK HERE]**
 
 | Report Section | Figures | Code |
 |---|---|---|
-| 1.4 — LQR feedforward effect | `matlab/figures/lqr/feedforward/` | `matlab/class_1_4_LQR_Design.m` |
-| 1.6 — LQR variants (ES) | `matlab/figures/lqr/full/` | `matlab/class_1_4_LQR_Design.m`, `matlab/src/` |
-| 2.2 — Lyapunov vs LQR (tuned) | `matlab/figures/lqr/tuning/`, `matlab/figures/lyapunov/` | `matlab/class_2_Lyapunov_Design.m`, `matlab/src/lyapunovCtrl.m` |
-| 3 — ICUAS Planning | — | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py`, `render.py`, `ros2/` |
+| 1.4 - LQR feedforward effect | `matlab/figures/lqr/feedforward/` | `matlab/class_1_4_LQR_Design.m` |
+| 1.6 - LQR variants (ES) | `matlab/figures/lqr/full/` | `matlab/class_1_4_LQR_Design.m`, `matlab/src/` |
+| 2.2 - Lyapunov vs LQR (tuned) | `matlab/figures/lqr/tuning/`, `matlab/figures/lyapunov/` | `matlab/class_2_Lyapunov_Design.m`, `matlab/src/lyapunovCtrl.m` |
+| 3 - ICUAS Planning | - | `competition/main.py`, `main_sombra.py`, `planeador.py`, `mapa.py`, `render.py`, `ros2/` |
 
 ---
 
