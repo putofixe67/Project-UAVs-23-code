@@ -17,7 +17,7 @@ for _f in (
 
 FONT_MAIN = "Nimbus Sans"
 FONT_MONO = "Liberation Mono"
-FIG_W, FIG_H, FIG_DPI = 19.2, 10.8, 200
+FIG_W, FIG_H, FIG_DPI = 19.2, 10.8, 100
 C_WALL  = "#2C2C2C"
 C_RPATH = "#BDBDBD"
 C_BASE  = "#F4D03F"
