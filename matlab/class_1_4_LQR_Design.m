@@ -8,7 +8,7 @@ clear; close all; clc;
 %    figures/lqr/full/         – full results (Nonlinear, ES, Linear)
 % ===============================================================
 
-addpath("src\");
+addpath("src");
 init();
 
 ref.p = p_desired;

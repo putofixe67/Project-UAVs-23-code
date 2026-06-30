@@ -7,7 +7,7 @@
 %                         velocity error, error norm + animation
 % ===============================================================
 
-addpath("src\");
+addpath("src");
 
 % Run LQR design (saves its own figure sets) and inherit workspace
 class_1_4_LQR_Design();
