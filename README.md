@@ -386,7 +386,7 @@ https://github.com/user-attachments/assets/30812cee-1844-43c5-882f-f7da6eb45c84
 
 ## Report
 
-Full report (PDF): **[INSERT REPORT LINK HERE]**
+Full report (PDF): **[Project_Report_23_G06.pdf](docs/Project_Report_23_G06.pdf)**
 
 | Report Section | Figures | Code |
 |---|---|---|
