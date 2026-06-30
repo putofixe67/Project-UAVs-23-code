@@ -173,6 +173,14 @@ The [ICUAS 2026 UAV Competition](https://github.com/larics/icuas26_competition) 
 
 For this project the scenario is simplified: the rover path is fully known in advance, and the focus is exclusively on the **relay planning and animation** problem.
 
+### Map Overview
+
+Before implementing any planner, a 2D overview of the environment was generated (`mapaperf.py`) to build a clear picture of the problem: obstacle layout, rover route, base station, ArUco marker positions, and landing pads — all extracted directly from the competition STL mesh.
+
+<p align="center">
+  <img src="competition/mapa_completo_relatorio.png" width="80%"/>
+</p>
+
 ---
 
 ### Planning Algorithm
