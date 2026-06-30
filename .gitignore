@@ -1,0 +1,16 @@
+# MATLAB autosaves
+*.asv
+
+# MATLAB generated figures (PNGs) – GIFs are kept for the README
+matlab/figures/**/*.png
+
+# Python cache and outputs
+competition/mapa_cache.pkl
+competition/*.mp4
+competition/*.npz
+competition/*.png
+
+# General
+__pycache__/
+*.pyc
+.DS_Store
