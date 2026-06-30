@@ -9,7 +9,8 @@ matlab/figures/**/*.png
 competition/mapa_cache.pkl
 competition/*.mp4
 competition/*.npz
-competition/*.png
+competition/drone_relay*.png
+competition/drone_relay_sombra*.png
 
 # General
 __pycache__/
