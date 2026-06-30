@@ -51,7 +51,6 @@ Project-UAVs-23-code/
     ├── init.m                         # Parameters, trajectory, gains
     ├── class_1_4_LQR_Design.m        # Part 1 - LQR simulation (3 variants)
     ├── class_2_Lyapunov_Design.m     # Part 2 - Lyapunov simulation
-    ├── archive/maio.m                 # Early standalone comparison (superseded)
     │
     ├── src/                           # Helper functions (added to MATLAB path by scripts)
     │   ├── animateUAV.m              # 3D animation playback

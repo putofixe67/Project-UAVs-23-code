@@ -1,5 +1,6 @@
-# MATLAB autosaves
+# MATLAB autosaves and archived scripts
 *.asv
+matlab/archive/
 
 # MATLAB generated figures (PNGs) – GIFs are kept for the README
 matlab/figures/**/*.png
