@@ -10,9 +10,6 @@
 1. [Project Overview](#project-overview)
 2. [Repository Structure](#repository-structure)
 3. [Part 1 - Linear Control (LQR)](#part-1--linear-control-lqr)
-   - [Effect of Feedforward Terms](#effect-of-feedforward-terms)
-   - [LQR Variants Comparison](#lqr-variants-comparison)
-   - [Tuning Effect](#tuning-effect)
 4. [Part 2 - Nonlinear Control (Lyapunov)](#part-2--nonlinear-control-lyapunov)
    - [Performance Results](#performance-results)
 5. [Part 3 - ICUAS-Inspired Planning](#part-3--icuas-inspired-planning)
@@ -97,53 +94,19 @@ Three LQR variants are compared on the same spiral trajectory. A desired velocit
 
 All use forward Euler integration. The shared spiral reference (1 m radius, 2 revolutions, 10 s, +0.1 m/s ascent) and all gains are configured in `init.m`.
 
-### Effect of Feedforward Terms
+### Animation
 
-Without feedforward terms the controller tracks only position, causing a persistent delay and radial offset along the spiral. Adding the desired velocity $v_d$ reduces the offset; adding both $v_d$ and $a_d$ nearly eliminates it.
+<p align="center">
+  <img src="src/figures/lqr/feedforward/UAV_Animation.gif" width="55%"/>
+</p>
 
-![3D Trajectory — Feedforward Comparison](src/figures/lqr/feedforward/3D_Trajectory.png)
+*Feedforward effect: No FF (blue), $v_d$ only (green), full $v_d+a_d$ (red).*
 
-*3D trajectory: No Feedforward (blue), $v_d$ only (green), Full $v_d + a_d$ (red).*
+<p align="center">
+  <img src="src/figures/lqr/full/UAV_Animation.gif" width="55%"/>
+</p>
 
-![Position Error — Feedforward Comparison](src/figures/lqr/feedforward/Position_Error.png)
-
-*Position error per axis. The no-feedforward case (blue) shows large sustained offset; both feedforward terms (red) keeps error within the $3\sigma$ bound throughout.*
-
-![Velocity Error — Feedforward Comparison](src/figures/lqr/feedforward/Velocity_Error.png)
-
----
-
-### LQR Variants Comparison
-
-With full feedforward the three LQR formulations track closely. The linearized model gives a marginally lower error since the gain was computed on it; the error-space formulation is numerically identical to the nonlinear variant.
-
-![3D Trajectory — LQR Variants](src/figures/lqr/full/3D_Trajectory.png)
-
-*LQR Nonlinear (blue), LQR Nonlinear ES (green), LQR Linear (red).*
-
-![Position Error — LQR Variants](src/figures/lqr/full/Position_Error.png)
-
-![Velocity Error — LQR Variants](src/figures/lqr/full/Velocity_Error.png)
-
-### UAV Animations — Part 1
-
-<img src="src/figures/lqr/feedforward/UAV_Animation.gif" width="49%"/> <img src="src/figures/lqr/full/UAV_Animation.gif" width="49%"/>
-
-*Left: feedforward effect (no FF / $v_d$ only / full $v_d+a_d$). Right: LQR variants (nonlinear / nonlinear ES / linear).*
-
----
-
-### Tuning Effect
-
-Default identity weights ($Q = I_6$, $R = I_3$) leave significant radial error. After tuning ($Q_{11}=Q_{22}=Q_{44}=38$, $R = 8.5\,I_3$) the spiral is tracked much more tightly with the same controller structure.
-
-![3D Trajectory — Tuning Effect](src/figures/lqr/tuning/3D_Trajectory.png)
-
-*Untuned Q/R (red) vs Tuned Q/R (blue).*
-
-![Position Error — Tuning Effect](src/figures/lqr/tuning/Position_Error.png)
-
-![Velocity Error — Tuning Effect](src/figures/lqr/tuning/Velocity_Error.png)
+*LQR variants: Nonlinear (blue), Nonlinear ES (green), Linear (red).*
 
 ---
 
@@ -165,25 +128,13 @@ $$\dot{V} = -v^T (d I + K_v) v \le 0$$
 
 so by **LaSalle's Invariance Principle** the state converges to zero: the equilibrium $(p,v)=(0,0)$ is **asymptotically stable** (locally, under the ±40° pitch/roll saturation used in simulation).
 
-![3D Trajectory — Lyapunov vs LQR](src/figures/lyapunov/3D_Trajectory.png)
+### Animation
 
-*All tuned controllers: LQR Nonlinear (blue), LQR Nonlinear ES (green), LQR Linear (red), Lyapunov (purple).*
+<p align="center">
+  <img src="src/figures/lyapunov/UAV_Animation.gif" width="55%"/>
+</p>
 
-![Position Error — Lyapunov vs LQR](src/figures/lyapunov/Position_Error.png)
-
-![Velocity Error — Lyapunov vs LQR](src/figures/lyapunov/Velocity_Error.png)
-
-![State Error Norm — Lyapunov vs LQR](src/figures/lyapunov/Error_Norm.png)
-
-*Error norm: the Lyapunov controller enters the $3\sigma$ band faster than all LQR variants despite a larger initial overshoot.*
-
-### UAV Animation — Part 2
-
-![UAV Animation — Lyapunov vs LQR](src/figures/lyapunov/UAV_Animation.gif)
-
-*All four tuned controllers simulated simultaneously on the spiral trajectory.*
-
----
+*All four tuned controllers: LQR Nonlinear (blue), LQR Nonlinear ES (green), LQR Linear (red), Lyapunov (purple).*
 
 ### Performance Results
 
@@ -297,13 +248,13 @@ The render selects every `stride`-th physics frame so the video duration matches
 
 **Step 3 - Per-frame update**  
 Each rendered frame updates:
-- **Relay links** - a dark-blue poly-line drawn between connected nodes. The connectivity state is reported by the status badge (`● LINK ACTIVE` in blue / `✖ LINK BROKEN` in red); the badge turns red if the chain ever breaks, which it does not in either validated run
+- **Relay links** - a dark-blue poly-line drawn between connected nodes. The connectivity state is reported by the status badge (`● LINK ACTIVE` in blue / `✖ LINK BROKEN` in red)
 - **Drone markers** - a custom top-view quadrotor shape (body disc + 4 arms + 4 rotor discs in an X layout, at 45°, 135°, 225°, 315°) for relay drones; the **same quadrotor shape in purple** for the shadow drone in Option B
 - **Rover marker** - rectangular body + 4 wheel circles, rotated to match the rover's instantaneous heading
-- **Status overlays** - live simulation time, the `● LINK ACTIVE / ✖ LINK BROKEN` badge, and the count of UAVs currently linked to the rover (or to the shadow, in Option B)
+- **Status overlays** - live simulation time, the `● LINK ACTIVE / ✖ LINK BROKEN` badge, and the count of UAVs currently linked to the rover
 - **Right panel** - legend and simulation info (frame, time, relay status)
 
-Both options render at **4K UHD** (3840×2160, 200 DPI) through `render.py`. Lighter 1080p versions for the web are produced afterwards by a separate FFmpeg pass.
+Both options render at **4K UHD** (3840×2160, 200 DPI) through `render.py`.
 
 ---
 
