@@ -346,21 +346,33 @@ If `crazyflie_interfaces` is not installed, the node runs in a logging-only mode
 ### Option A - 5 Free Relay Drones
 > 5 Crazyflie drones planning their relay positions across the ICUAS 2026 city map to maintain connectivity from base to rover.
 
-[Python 2D Animation (5 relay drones)](https://github.com/user-attachments/assets/9959c9e4-abb2-4fd3-8a33-7f2756ada750)
+<div align="center">
+
+https://github.com/user-attachments/assets/9959c9e4-abb2-4fd3-8a33-7f2756ada750
+
+</div>
 
 ---
 
 ### Option B - Shadow Drone + 4 Free Relays
 > Shadow drone locked above rover; 4 relay drones connect it back to the base.
 
-[Python 2D Animation (4 relays + shadow drone)](https://github.com/user-attachments/assets/b3317299-f46f-4617-acd5-371c7bf41e3d)
+<div align="center">
+
+https://github.com/user-attachments/assets/b3317299-f46f-4617-acd5-371c7bf41e3d
+
+</div>
 
 ---
 
 ### Gazebo Simulation
 > ROS 2 + Gazebo simulation of the ICUAS 2026 environment.
 
-[Gazebo 3D Animation (5 relay drones)](https://github.com/user-attachments/assets/30812cee-1844-43c5-882f-f7da6eb45c84)
+<div align="center">
+
+https://github.com/user-attachments/assets/30812cee-1844-43c5-882f-f7da6eb45c84
+
+</div>
 
 ---
 
