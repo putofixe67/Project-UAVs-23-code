@@ -107,13 +107,13 @@ All use forward Euler integration. The shared spiral reference (1 m radius, 2 re
   <img src="matlab/figures/lqr/feedforward/UAV_Animation.gif" width="55%"/>
 </p>
 
-*Feedforward effect: No FF (blue), $v_d$ only (green), full $v_d+a_d$ (red).*
+*Feedforward effect: No FF (blue), v<sub>d</sub> only (green), full v<sub>d</sub>+a<sub>d</sub> (red).*
 
 <p align="center">
   <img src="matlab/figures/lqr/full/UAV_Animation.gif" width="55%"/>
 </p>
 
-*LQR variants: Nonlinear (blue), Nonlinear ES (green), Linear (red).*
+*LQR variants: Nonlinear (blue), Nonlinear ES (green), Linear (red). Nonlinear and ES overlap — they are numerically identical on this trajectory.*
 
 ---
 
